@@ -1,0 +1,161 @@
+:root{
+  --bg:#070b12; --bg2:#0c121d; --panel:#0e1622; --panel2:#121c2b;
+  --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+  --txt:#eaf1fb; --muted:#94a6bf;
+  --ai:#8ff6ff; --fire:#ff5a1f; --fire2:#ff3b30;
+  --r1:#2ec36b; --r2:#ffd23f; --r3:#ff9f1c; --r4:#ff3b30; --r5:#b026ff;
+  --shadow:0 24px 70px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:radial-gradient(1200px 600px at 80% -10%,rgba(255,90,31,.10),transparent 60%),
+             radial-gradient(900px 500px at 0% 110%,rgba(143,246,255,.08),transparent 55%),
+             var(--bg);
+  color:var(--txt); font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  display:flex; flex-direction:column; min-height:100vh; overflow-x:hidden;
+}
+
+/* ---------- Topbar ---------- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:18px;
+  padding:14px 22px; background:linear-gradient(180deg,rgba(12,18,29,.96),rgba(8,12,18,.92));
+  border-bottom:1px solid var(--line2); position:sticky; top:0; z-index:1200; backdrop-filter:blur(8px);
+}
+.brandHQ{display:flex; align-items:center; gap:14px}
+.flame{font-size:34px; filter:drop-shadow(0 0 14px rgba(255,90,31,.6)); animation:flick 2.4s infinite}
+@keyframes flick{0%,100%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-1px) scale(1.06);opacity:.9}}
+.brandHQtext strong{font-size:21px; letter-spacing:.5px; display:block; line-height:1.1}
+.brandHQtext .ai{color:var(--ai)}
+.brandHQtext small{color:var(--muted); font-size:12px}
+.topMeta{display:flex; align-items:center; gap:20px}
+.natRisk{display:flex; flex-direction:column; align-items:flex-end; padding:6px 16px; border-radius:14px; background:var(--panel2); border:1px solid var(--line2); min-width:150px}
+.natRiskLabel{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px}
+.natRiskValue{font-size:18px; font-weight:800}
+.liveClock{display:flex; align-items:center; gap:8px; font-variant-numeric:tabular-nums; color:var(--muted); font-size:14px}
+.livedot{width:9px;height:9px;border-radius:50%;background:#2ec36b;box-shadow:0 0 10px #2ec36b;animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.byEv{font-size:12px;color:var(--muted)} .byEv strong{color:var(--ai)}
+
+/* ---------- HQ layout ---------- */
+.hq{flex:1; display:grid; grid-template-columns:1fr 400px; gap:0; min-height:0}
+.mapWrap{position:relative; min-height:520px}
+#map{position:absolute; inset:0; background:#0a0f17}
+.loadingMap{position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:600;
+  background:rgba(8,12,18,.92); border:1px solid var(--line2); padding:10px 18px; border-radius:30px;
+  display:flex; align-items:center; gap:10px; font-size:13px; box-shadow:var(--shadow)}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);border-top-color:var(--fire);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.mapLegend{position:absolute; left:14px; bottom:14px; z-index:600; background:rgba(8,12,18,.88);
+  border:1px solid var(--line2); border-radius:14px; padding:12px 14px; font-size:12px; box-shadow:var(--shadow); max-width:200px}
+.mapLegend b{display:block; margin-bottom:8px; font-size:12px}
+.mapLegend span{display:flex; align-items:center; gap:8px; margin:3px 0; color:var(--muted)}
+.mapLegend i{width:13px;height:13px;border-radius:4px;display:inline-block;flex:0 0 auto}
+.locateBtn{position:absolute; right:14px; top:14px; z-index:600; background:var(--ai); color:#04222a;
+  border:none; font-weight:800; padding:11px 16px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow)}
+.locateBtn:hover{filter:brightness(1.08)}
+
+/* ---------- Panel ---------- */
+.panel{background:linear-gradient(180deg,var(--bg2),var(--bg)); border-left:1px solid var(--line2);
+  padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; max-height:calc(100vh - 64px)}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:16px}
+.card.promitheas{background:linear-gradient(180deg,rgba(143,246,255,.08),rgba(143,246,255,.02)); border-color:rgba(143,246,255,.30); box-shadow:0 0 40px rgba(143,246,255,.08)}
+.cardHead{display:flex; align-items:center; gap:9px; margin-bottom:10px; justify-content:space-between}
+.cardHead b{font-size:15px}
+.cardHead .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.dot.ai{background:var(--ai); box-shadow:0 0 12px var(--ai)}
+.aiSay{margin:0; line-height:1.55; font-size:14.5px; white-space:pre-line}
+.muted{color:var(--muted); font-size:13px; line-height:1.5; margin:6px 0}
+.pill{background:var(--panel2); border:1px solid var(--line2); border-radius:20px; padding:3px 12px; font-size:13px; font-weight:700}
+.small{font-size:11.5px}
+.warn{color:#ffd9a0}
+
+.bigBtn{width:100%; border:none; border-radius:14px; padding:14px; font-weight:800; font-size:15px; cursor:pointer; margin-top:10px; transition:.15s}
+.bigBtn.safe{background:linear-gradient(135deg,#8ff6ff,#39d0e6); color:#04222a}
+.bigBtn.report{background:linear-gradient(135deg,#ff7a3c,#ff3b30); color:#fff}
+.bigBtn:hover{transform:translateY(-1px); filter:brightness(1.06)}
+
+.safeBox{margin-top:12px; padding:14px; border-radius:14px; background:var(--panel2); border:1px solid var(--line2); line-height:1.55; font-size:14px}
+.safeBox h4{margin:0 0 8px; font-size:15px}
+.safeBox .dir{font-size:22px; font-weight:800; color:var(--ai)}
+.safeBox ul{margin:8px 0 0; padding-left:18px} .safeBox li{margin:4px 0}
+
+.regionList{display:flex; flex-direction:column; gap:7px}
+.regRow{display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px; background:var(--panel2); border:1px solid var(--line); cursor:pointer; transition:.12s}
+.regRow:hover{border-color:var(--line2); transform:translateX(2px)}
+.regBadge{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#06121f;flex:0 0 auto}
+.regName{font-weight:700; font-size:14px}
+.regMeta{color:var(--muted); font-size:12px}
+.regRight{margin-left:auto; text-align:right}
+
+.reportList{display:flex; flex-direction:column; gap:6px; margin-top:8px}
+.repItem{font-size:13px; padding:8px 10px; border-radius:10px; background:rgba(255,90,31,.10); border:1px solid rgba(255,90,31,.30)}
+.repItem b{color:#ffb98a}
+
+/* ---------- Footer ---------- */
+.hqFooter{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
+  padding:11px 22px; background:var(--bg2); border-top:1px solid var(--line); font-size:12px; color:var(--muted)}
+
+/* ---------- Modal ---------- */
+.modalOverlay{position:fixed; inset:0; background:rgba(4,7,12,.78); backdrop-filter:blur(4px); z-index:2000; display:flex; align-items:center; justify-content:center; padding:20px}
+.modalOverlay[hidden]{display:none}
+.modalCard{background:var(--panel); border:1px solid var(--line2); border-radius:22px; padding:26px; width:min(460px,100%); position:relative; box-shadow:var(--shadow)}
+.modalCard h3{margin:0 0 6px}
+.modalClose{position:absolute; top:12px; right:14px; background:none; border:none; color:var(--muted); font-size:28px; cursor:pointer; line-height:1}
+.modalCard textarea{width:100%; min-height:90px; margin:10px 0; padding:12px; border-radius:12px; background:var(--bg); border:1px solid var(--line2); color:var(--txt); font-family:inherit; resize:vertical}
+.modalCard select{width:100%; padding:11px; border-radius:12px; background:var(--bg); border:1px solid var(--line2); color:var(--txt); font-family:inherit}
+
+/* Leaflet popups dark */
+.leaflet-popup-content-wrapper{background:#0e1622; color:#eaf1fb; border:1px solid var(--line2); border-radius:14px}
+.leaflet-popup-tip{background:#0e1622}
+.leaflet-popup-content{margin:12px 14px; font-size:13px; line-height:1.5}
+.leaflet-container{font-family:inherit}
+.riskPulse{border-radius:50%}
+
+/* National status strip (απλά λόγια) */
+.statusStrip{padding:11px 22px; font-size:14.5px; display:flex; flex-wrap:wrap; gap:3px 14px; align-items:center;
+  background:#1a2230; color:#fff; border-bottom:1px solid var(--line2); line-height:1.35; transition:background .4s}
+.statusStrip b{font-weight:800} .statusStrip span{opacity:.94}
+/* Αναζήτηση περιοχής */
+.regSearch{width:100%; margin-bottom:11px; padding:11px 13px; border-radius:11px; background:var(--bg);
+  border:1px solid var(--line2); color:var(--txt); font-family:inherit; font-size:14px}
+.regSearch::placeholder{color:var(--muted)}
+.regSearch:focus{outline:none; border-color:var(--ai); box-shadow:0 0 0 3px rgba(143,246,255,.15)}
+/* Κουμπί διαφυγής Google Maps */
+.gmapsBtn{display:block; text-align:center; text-decoration:none; margin-top:12px}
+
+/* Κουμπί + προβολή Αρχών/Δήμων */
+.authBtn{background:linear-gradient(135deg,#ff7a3c,#ff3b30); color:#fff; border:none; font-weight:800; padding:9px 14px; border-radius:11px; cursor:pointer; font-size:13.5px; white-space:nowrap}
+.authBtn:hover{filter:brightness(1.08)}
+.updTime{margin-left:auto; color:var(--muted); font-size:11.5px; font-weight:600}
+.authView{position:fixed; inset:0; z-index:3000; background:var(--bg); overflow-y:auto; padding:24px}
+.authInner{max-width:1120px; margin:0 auto}
+.authTop{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; flex-wrap:wrap}
+.authTop h2{margin:0; font-size:24px}
+.authClose{background:var(--panel2); color:var(--txt); border:1px solid var(--line2); padding:10px 16px; border-radius:11px; cursor:pointer; font-weight:700}
+.authClose:hover{border-color:var(--ai)}
+.authStats{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:8px}
+.statCard{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; text-align:center}
+.statV{font-size:30px; font-weight:800; line-height:1}
+.statL{color:var(--muted); font-size:12.5px; margin-top:8px}
+.authView h3{margin:24px 0 10px; font-size:17px}
+.authTableWrap{overflow-x:auto; border:1px solid var(--line); border-radius:14px}
+.authTable{width:100%; border-collapse:collapse; font-size:13.5px; min-width:580px}
+.authTable th,.authTable td{padding:10px 13px; text-align:left; border-bottom:1px solid var(--line)}
+.authTable th{background:var(--panel2); color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.5px}
+.authTable tbody tr:hover{background:rgba(255,255,255,.03)}
+.tBadge{display:inline-flex; width:23px; height:23px; align-items:center; justify-content:center; border-radius:7px; font-weight:800; color:#06121f; margin-right:7px}
+.authReports{display:flex; flex-direction:column; gap:8px; max-width:780px}
+
+/* ---------- Mobile ---------- */
+@media(max-width:900px){
+  .hq{grid-template-columns:1fr; grid-template-rows:auto auto}
+  .mapWrap{height:50vh; min-height:340px}
+  .panel{max-height:none; border-left:none; border-top:1px solid var(--line2)}
+  .topMeta{gap:12px} .byEv{display:none}
+  .brandHQtext small{display:none}
+}
+@media(max-width:560px){
+  .natRisk{min-width:auto} .liveClock{display:none}
+  .topbar{padding:11px 14px} .panel{padding:12px}
+}
