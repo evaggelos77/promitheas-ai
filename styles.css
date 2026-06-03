@@ -153,6 +153,12 @@ body{
 .fcLbl{font-size:11.5px; color:var(--muted); text-transform:capitalize}
 .fcDot{width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:800; color:#06121f; font-size:17px; box-shadow:0 4px 14px rgba(0,0,0,.3)}
 
+/* Επίπεδα χάρτη (toggle buttons) */
+.layerBtns{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+.layerBtn{background:var(--panel2); color:var(--muted); border:1px solid var(--line2); padding:9px 12px; border-radius:11px; cursor:pointer; font-size:13px; font-weight:700; transition:.15s}
+.layerBtn:hover{border-color:var(--ai); color:var(--txt)}
+.layerBtn.active{background:linear-gradient(135deg,#8ff6ff,#39d0e6); color:#04222a; border-color:transparent}
+
 /* ---------- Mobile ---------- */
 @media(max-width:900px){
   .hq{grid-template-columns:1fr; grid-template-rows:auto auto}

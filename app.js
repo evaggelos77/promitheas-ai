@@ -257,32 +257,36 @@ function promitheasSay(sorted){
   document.getElementById('aiSay').textContent = msg;
 }
 
-// ---- Ενεργές εστίες — EFFIS / Copernicus WMS (δημόσιο, ΧΩΡΙΣ κλειδί) ----
-let firesLayer = null, firesOn = true;
-function loadFires(){
-  const pill = document.getElementById('firesPill');
-  const note = document.getElementById('firesNote');
-  try{
-    if(!firesLayer){
-      firesLayer = L.tileLayer.wms('https://maps.effis.emergency.copernicus.eu/effis', {
-        layers:'all.hs', format:'image/png', transparent:true, version:'1.3.0',
-        opacity:0.95, attribution:'Εστίες: EFFIS / Copernicus'
-      });
-      firesLayer.on('tileerror', ()=>{ note.textContent='Το επίπεδο εστιών δεν αποκρίνεται προσωρινά.'; });
-    }
-    if(firesOn) firesLayer.addTo(map);
-    pill.textContent = firesOn ? 'ON' : 'OFF';
-    note.innerHTML = 'Ζωντανός δορυφορικός εντοπισμός φωτιάς (EFFIS/Copernicus — VIIRS &amp; MODIS, τελευταίες ώρες). Κόκκινα σημεία στον χάρτη όταν υπάρχουν εντοπισμοί.';
-  }catch(e){
-    pill.textContent='—';
-    note.textContent='Δεν φορτώθηκε το επίπεδο εστιών.';
-  }
+// ---- Επίπεδα χάρτη — EFFIS / Copernicus WMS (δημόσιο, ΧΩΡΙΣ κλειδί) ----
+const EFFIS_WMS = 'https://maps.effis.emergency.copernicus.eu/effis';
+const todayISO = () => new Date().toISOString().slice(0,10);
+const LAYER_DEFS = {
+  fires: {layers:'all.hs',               label:'🛰️ Ενεργές εστίες',      on:true,  opacity:0.95},
+  fwi:   {layers:'mf010.fwi',            label:'🔥 Επικινδυνότητα (FWI)', on:false, opacity:0.55, time:true},
+  burnt: {layers:'modis.ba.poly.season', label:'🌳 Καμένες φέτος',        on:false, opacity:0.6}
+};
+const wmsLayers = {};
+function makeWms(def){
+  const opts = {layers:def.layers, format:'image/png', transparent:true, version:'1.3.0', opacity:def.opacity, attribution:'EFFIS / Copernicus'};
+  if(def.time) opts.time = todayISO();
+  return L.tileLayer.wms(EFFIS_WMS, opts);
 }
-function toggleFires(){
-  if(!firesLayer){ loadFires(); return; }
-  firesOn = !firesOn;
-  if(firesOn) firesLayer.addTo(map); else map.removeLayer(firesLayer);
-  document.getElementById('firesPill').textContent = firesOn ? 'ON' : 'OFF';
+function initLayers(){
+  const box = document.getElementById('layerBtns'); if(!box) return;
+  box.innerHTML = '';
+  Object.entries(LAYER_DEFS).forEach(([k,def])=>{
+    if(!wmsLayers[k]) wmsLayers[k] = makeWms(def);
+    if(def.on) wmsLayers[k].addTo(map);
+    const b = document.createElement('button');
+    b.className = 'layerBtn' + (def.on ? ' active' : '');
+    b.textContent = def.label;
+    b.onclick = ()=>{
+      def.on = !def.on;
+      if(def.on){ wmsLayers[k].addTo(map); b.classList.add('active'); }
+      else { map.removeLayer(wmsLayers[k]); b.classList.remove('active'); }
+    };
+    box.appendChild(b);
+  });
 }
 
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----
@@ -404,7 +408,6 @@ async function boot(){
   const rs=document.getElementById('regSearch'); if(rs) rs.oninput=()=>searchRegions(rs.value);
   document.getElementById('authBtn').onclick=openAuth;
   document.getElementById('authClose').onclick=()=>document.getElementById('authView').hidden=true;
-  document.getElementById('firesToggle').onclick=toggleFires;
 
   async function refresh(){
     const load=document.getElementById('loadingMap'); load.style.display='flex';
@@ -413,7 +416,7 @@ async function boot(){
     load.style.display='none';
   }
   await refresh();
-  loadFires();
+  initLayers();
   setInterval(refresh, REFRESH_MS);
 }
 document.addEventListener('DOMContentLoaded', boot);
