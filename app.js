@@ -109,8 +109,8 @@ async function fetchAll(){
   const lons = REGIONS.map(r=>r.lon).join(',');
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}`
     + `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m`
-    + `&daily=temperature_2m_max,wind_speed_10m_max,precipitation_sum`
-    + `&past_days=3&forecast_days=1&timezone=auto&wind_speed_unit=kmh`;
+    + `&daily=temperature_2m_max,wind_speed_10m_max,wind_direction_10m_dominant,precipitation_sum`
+    + `&past_days=3&forecast_days=7&timezone=auto&wind_speed_unit=kmh`;
   const res = await fetch(url);
   if(!res.ok) throw new Error('weather '+res.status);
   let data = await res.json();
@@ -121,16 +121,26 @@ async function fetchAll(){
 function parsePoint(d, region){
   const cur = d.current||{};
   const dly = d.daily||{};
-  const last = (arr)=> Array.isArray(arr)&&arr.length? arr[arr.length-1] : null;
-  const rain3 = Array.isArray(dly.precipitation_sum)
-    ? dly.precipitation_sum.slice(0,-1).reduce((a,b)=>a+(b||0),0) : 0;
-  const temp = last(dly.temperature_2m_max) ?? cur.temperature_2m ?? 25;
-  const wind = last(dly.wind_speed_10m_max) ?? cur.wind_speed_10m ?? 10;
-  const hum  = cur.relative_humidity_2m ?? 40;
-  const wdir = cur.wind_direction_10m ?? 0;
-  const score = fireRisk({temp,hum,wind,rain3});
-  return {...region, temp:Math.round(temp), hum:Math.round(hum), wind:Math.round(wind),
-          wdir, rain3:Math.round(rain3*10)/10, score, cat:categoryOf(score)};
+  const T=dly.temperature_2m_max||[], W=dly.wind_speed_10m_max||[],
+        WD=dly.wind_direction_10m_dominant||[], P=dly.precipitation_sum||[], times=dly.time||[];
+  const humNow = cur.relative_humidity_2m ?? 40;
+  const PAST = 3; // past_days στο API
+  const start = Math.min(PAST, Math.max(0, times.length-1)); // δείκτης «σήμερα»
+  const dayRisk = (i)=>{
+    const temp = T[i] ?? cur.temperature_2m ?? 25;
+    const wind = W[i] ?? cur.wind_speed_10m ?? 10;
+    const rain3 = P.slice(Math.max(0,i-2), i+1).reduce((a,b)=>a+(b||0),0); // κυλιόμενη ξηρασία
+    return fireRisk({temp, hum:humNow, wind, rain3});
+  };
+  const forecast=[];
+  for(let i=start; i<times.length && forecast.length<7; i++){
+    const s=dayRisk(i);
+    forecast.push({date:times[i]||'', score:s, cat:categoryOf(s), temp:Math.round(T[i]??0), wind:Math.round(W[i]??0)});
+  }
+  const t0 = forecast[0] || {score:0, cat:categoryOf(0), temp:Math.round(cur.temperature_2m??25), wind:Math.round(cur.wind_speed_10m??10)};
+  const wdir = cur.wind_direction_10m ?? WD[start] ?? 0;
+  return {...region, temp:t0.temp, hum:Math.round(humNow), wind:t0.wind, wdir,
+          score:t0.score, cat:t0.cat, forecast};
 }
 
 // ---- Render: χάρτης + λίστα + εθνικός + Προμηθέας ----
@@ -142,9 +152,9 @@ function render(points){
       radius:r, color:'#000', weight:1, opacity:.4,
       fillColor:p.cat.color, fillOpacity:.78
     }).addTo(markersLayer).bindPopup(
-      `<b>${p.n}</b><br>Κίνδυνος: <b style="color:${p.cat.color}">${p.cat.idx} · ${p.cat.label}</b> (${p.score}/100)`
+      `<b>${p.n}</b><br>Κίνδυνος σήμερα: <b style="color:${p.cat.color}">${p.cat.idx} · ${p.cat.label}</b> (${p.score}/100)`
       +`<br>🌡️ ${p.temp}°C · 💧 ${p.hum}% · 💨 ${p.wind} χλμ/η ${compass(p.wdir)}`
-      +`<br>🌧️ Βροχή 3ημ.: ${p.rain3}mm`
+      +`<br><span style="opacity:.7">Πρόβλεψη 5ημ.:</span> ${fcMini(p)}`
     );
   });
 
@@ -160,6 +170,7 @@ function render(points){
   LAST_POINTS = sorted;
   renderList(sorted.slice(0,8));
   setStatusStrip(top);
+  renderForecast(sorted);
   const ut=document.getElementById('updTime'); if(ut) ut.textContent='ανανέωση '+new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
   promitheasSay(sorted);
 }
@@ -195,6 +206,24 @@ function setStatusStrip(top){
   strip.style.background = top.cat.color;
   strip.style.color = top.cat.idx===2 ? '#1a1200' : '#fff';
   strip.innerHTML = `<b>ΣΗΜΕΡΑ ΣΤΗΝ ΕΛΛΑΔΑ · Κίνδυνος ${top.cat.idx}/5 — ${top.cat.label}</b><span>${advice}</span>`;
+}
+
+// ---- Πρόβλεψη κινδύνου (έως 7 ημέρες, από πρόγνωση καιρού) ----
+const fcMini = p => (p.forecast||[]).slice(0,5).map(f=>
+  `<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${f.cat.color};margin:0 1px" title="${f.cat.label} (${f.score})"></span>`).join('') || '—';
+function renderForecast(points){
+  const el=document.getElementById('natForecast'); if(!el) return;
+  if(!points.length || !points[0].forecast || !points[0].forecast.length){ el.innerHTML='<span class="muted">—</span>'; return; }
+  const days=Math.min(5, points[0].forecast.length);
+  let html='';
+  for(let d=0; d<days; d++){
+    const maxCat=points.reduce((m,p)=>{ const f=p.forecast[d]; return f && f.cat.idx>m ? f.cat.idx : m; }, 1);
+    const c=CAT[maxCat-1];
+    const dt=new Date(points[0].forecast[d].date);
+    const lbl = d===0?'Σήμ.' : d===1?'Αύρ.' : dt.toLocaleDateString('el-GR',{weekday:'short'}).replace('.','');
+    html+=`<div class="fcDay"><span class="fcLbl">${lbl}</span><span class="fcDot" style="background:${c.color}">${maxCat}</span></div>`;
+  }
+  el.innerHTML=html;
 }
 
 // ---- Ο ΠΡΟΜΗΘΕΑΣ μιλάει (data-driven· έτοιμο για σύνδεση με OpenAI) ----
