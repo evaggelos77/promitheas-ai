@@ -289,6 +289,70 @@ function initLayers(){
   });
 }
 
+// ---- Πυροσβεστικά μέσα (demo — συνδέεται με πραγματικό AVL/GPS στόλου) ----
+const UNITS = [
+  {n:'ΠΥ Αθηνών',lat:37.99,lon:23.73,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Πειραιά',lat:37.94,lon:23.64,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Θεσσαλονίκης',lat:40.63,lon:22.95,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Πάτρας',lat:38.24,lon:21.73,t:'🚒',s:'Καθ’ οδόν'},
+  {n:'ΠΥ Ηρακλείου',lat:35.33,lon:25.14,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Χανίων',lat:35.51,lon:24.02,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Λάρισας',lat:39.64,lon:22.41,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Βόλου',lat:39.36,lon:22.94,t:'🚒',s:'Σε συμβάν'},
+  {n:'ΠΥ Ιωαννίνων',lat:39.66,lon:20.85,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Καλαμάτας',lat:37.04,lon:22.11,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Τρίπολης',lat:37.51,lon:22.37,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Χαλκίδας',lat:38.46,lon:23.60,t:'🚒',s:'Καθ’ οδόν'},
+  {n:'ΠΥ Κέρκυρας',lat:39.62,lon:19.92,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Ρόδου',lat:36.43,lon:28.22,t:'🚒',s:'Διαθέσιμο'},
+  {n:'ΠΥ Λαμίας',lat:38.90,lon:22.43,t:'🚒',s:'Διαθέσιμο'},
+  {n:'Εναέριο Ελευσίνας',lat:38.07,lon:23.55,t:'🚁',s:'Διαθέσιμο'},
+  {n:'Εναέριο Θεσσαλονίκης',lat:40.52,lon:22.97,t:'🚁',s:'Διαθέσιμο'}
+];
+const unitColor = s => s==='Σε συμβάν' ? '#ff3b30' : s==='Καθ’ οδόν' ? '#ffd23f' : '#2ec36b';
+let unitsLayer=null, unitsOn=false;
+function makeUnitsLayer(){
+  const g=L.layerGroup();
+  UNITS.forEach(u=>{
+    const col=unitColor(u.s);
+    L.marker([u.lat,u.lon],{icon:L.divIcon({className:'unitIcon',html:`<div style="font-size:22px;filter:drop-shadow(0 0 4px ${col})">${u.t}</div>`,iconSize:[26,26],iconAnchor:[13,13]})})
+      .bindPopup(`${u.t} <b>${u.n}</b><br>Κατάσταση: <b style="color:${col}">${u.s}</b>`).addTo(g);
+  });
+  return g;
+}
+function toggleUnits(){
+  if(!unitsLayer) unitsLayer=makeUnitsLayer();
+  unitsOn=!unitsOn;
+  if(unitsOn) unitsLayer.addTo(map); else map.removeLayer(unitsLayer);
+  const b=document.getElementById('unitsBtn'); if(b) b.classList.toggle('active',unitsOn);
+}
+
+// ---- «Lite» μοντέλο εξάπλωσης φωτιάς (κώνος ανέμου) ----
+let spreadCone=null, spreadFire=null, spreadMode=false;
+function setSpreadMode(on){
+  spreadMode=on;
+  const mapEl=document.getElementById('map'); if(mapEl) mapEl.style.cursor=on?'crosshair':'';
+  const b=document.getElementById('spreadBtn');
+  if(b){ b.classList.toggle('active',on); b.textContent = on?'🎯 Κάνε κλικ στον χάρτη…':'🔥 Προσομοίωση εξάπλωσης'; }
+}
+async function simulateSpread(lat,lon){
+  let wind=15, wdir=0;
+  try{
+    const u=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh`;
+    const c=(await (await fetch(u)).json()).current||{}; wind=c.wind_speed_10m??15; wdir=c.wind_direction_10m??0;
+  }catch(e){}
+  const toBear=(wdir+180)%360;            // η φωτιά «τρέχει» downwind
+  const len=Math.min(30, 3+wind*0.45);    // χλμ, κλιμακώνεται με τον άνεμο
+  const pts=[[lat,lon]];
+  for(let a=-30;a<=30;a+=10){ const d=destinationPoint(lat,lon,(toBear+a+360)%360,len); pts.push([d.lat,d.lon]); }
+  pts.push([lat,lon]);
+  if(spreadCone) map.removeLayer(spreadCone);
+  if(spreadFire) map.removeLayer(spreadFire);
+  spreadCone=L.polygon(pts,{color:'#ff3b30',weight:1.5,fillColor:'#ff5a1f',fillOpacity:.35}).addTo(map);
+  spreadFire=L.circleMarker([lat,lon],{radius:8,color:'#fff',weight:2,fillColor:'#ff2d00',fillOpacity:1}).addTo(map);
+  spreadFire.bindPopup(`🔥 <b>Σημείο φωτιάς</b><br>Άνεμος ${Math.round(wind)} χλμ/η από ${compass(wdir)}<br><b style="color:#ff7a3c">Εξάπλωση προς ${compass(toBear)}</b> (~${len.toFixed(0)} χλμ)<br><span style="opacity:.7;font-size:11px">Εκτίμηση βάσει ανέμου — όχι φυσικό μοντέλο.</span>`).openPopup();
+}
+
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----
 function safeExit(){
   const box = document.getElementById('safeBox');
@@ -375,7 +439,8 @@ function openAuth(){
     + stat(high,'Περιοχές σε υψηλό (3+)',high?'#ff9f1c':'#2ec36b')
     + stat(`${avg}/100`,'Μέση βαθμολογία')
     + stat(reps.length,'Αναφορές πολιτών',reps.length?'#ff7a3c':'#94a6bf')
-    + stat(pts.length,'Περιοχές υπό παρακολούθηση','#8ff6ff');
+    + stat(pts.length,'Περιοχές υπό παρακολούθηση','#8ff6ff')
+    + stat(UNITS.length,'Πυροσβεστικά μέσα (demo)','#ff7a3c');
   const rows = pts.map((p,i)=>`<tr>
       <td>${i+1}</td><td><b>${p.n}</b></td>
       <td><span class="tBadge" style="background:${p.cat.color}">${p.cat.idx}</span>${p.cat.label}</td>
@@ -408,6 +473,9 @@ async function boot(){
   const rs=document.getElementById('regSearch'); if(rs) rs.oninput=()=>searchRegions(rs.value);
   document.getElementById('authBtn').onclick=openAuth;
   document.getElementById('authClose').onclick=()=>document.getElementById('authView').hidden=true;
+  document.getElementById('unitsBtn').onclick=toggleUnits;
+  document.getElementById('spreadBtn').onclick=()=>setSpreadMode(!spreadMode);
+  map.on('click', e=>{ if(spreadMode){ simulateSpread(e.latlng.lat, e.latlng.lng); setSpreadMode(false); } });
 
   async function refresh(){
     const load=document.getElementById('loadingMap'); load.style.display='flex';

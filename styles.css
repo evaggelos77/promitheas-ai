@@ -158,6 +158,8 @@ body{
 .layerBtn{background:var(--panel2); color:var(--muted); border:1px solid var(--line2); padding:9px 12px; border-radius:11px; cursor:pointer; font-size:13px; font-weight:700; transition:.15s}
 .layerBtn:hover{border-color:var(--ai); color:var(--txt)}
 .layerBtn.active{background:linear-gradient(135deg,#8ff6ff,#39d0e6); color:#04222a; border-color:transparent}
+#spreadBtn.active{background:linear-gradient(135deg,#ff7a3c,#ff3b30); color:#fff; border-color:transparent}
+.unitIcon{background:none; border:none}
 
 /* ---------- Mobile ---------- */
 @media(max-width:900px){
