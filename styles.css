@@ -160,6 +160,11 @@ body{
 .layerBtn.active{background:linear-gradient(135deg,#8ff6ff,#39d0e6); color:#04222a; border-color:transparent}
 #spreadBtn.active{background:linear-gradient(135deg,#ff7a3c,#ff3b30); color:#fff; border-color:transparent}
 .unitIcon{background:none; border:none}
+.spreadResult{margin-top:12px}
+.spreadResult:empty{display:none}
+.srHead{font-weight:800; font-size:13px; margin-bottom:4px; color:#ff9f1c}
+.srRow{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--line); font-size:13px}
+.srEta{color:var(--ai); font-weight:700; white-space:nowrap}
 
 /* ---------- Mobile ---------- */
 @media(max-width:900px){

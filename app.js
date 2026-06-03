@@ -79,6 +79,13 @@ function destinationPoint(lat,lon,brng,d){
   const lo2=lo+Math.atan2(Math.sin(br)*Math.sin(d/R)*Math.cos(la), Math.cos(d/R)-Math.sin(la)*Math.sin(la2));
   return {lat:la2*180/Math.PI, lon:((lo2*180/Math.PI)+540)%360-180};
 }
+// Απόσταση μεγάλου κύκλου (χλμ)
+function distKm(la1,lo1,la2,lo2){
+  const R=6371, t=x=>x*Math.PI/180;
+  const dla=t(la2-la1), dlo=t(lo2-lo1);
+  const a=Math.sin(dla/2)**2 + Math.cos(t(la1))*Math.cos(t(la2))*Math.sin(dlo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
 
 // ---- Υπολογισμός δείκτη κινδύνου (0-100) από ζωντανό καιρό ----
 function fireRisk({temp,hum,wind,rain3}){
@@ -328,7 +335,7 @@ function toggleUnits(){
 }
 
 // ---- «Lite» μοντέλο εξάπλωσης φωτιάς (κώνος ανέμου) ----
-let spreadCone=null, spreadFire=null, spreadMode=false;
+let spreadCone=null, spreadFire=null, spreadMode=false, responseLayer=null;
 function setSpreadMode(on){
   spreadMode=on;
   const mapEl=document.getElementById('map'); if(mapEl) mapEl.style.cursor=on?'crosshair':'';
@@ -350,7 +357,24 @@ async function simulateSpread(lat,lon){
   if(spreadFire) map.removeLayer(spreadFire);
   spreadCone=L.polygon(pts,{color:'#ff3b30',weight:1.5,fillColor:'#ff5a1f',fillOpacity:.35}).addTo(map);
   spreadFire=L.circleMarker([lat,lon],{radius:8,color:'#fff',weight:2,fillColor:'#ff2d00',fillOpacity:1}).addTo(map);
-  spreadFire.bindPopup(`🔥 <b>Σημείο φωτιάς</b><br>Άνεμος ${Math.round(wind)} χλμ/η από ${compass(wdir)}<br><b style="color:#ff7a3c">Εξάπλωση προς ${compass(toBear)}</b> (~${len.toFixed(0)} χλμ)<br><span style="opacity:.7;font-size:11px">Εκτίμηση βάσει ανέμου — όχι φυσικό μοντέλο.</span>`).openPopup();
+
+  // 🎯 Πλησιέστερα μέσα + εκτιμώμενος χρόνος άφιξης (Time to Arrival)
+  if(!unitsLayer) unitsLayer=makeUnitsLayer();
+  if(!unitsOn){ unitsLayer.addTo(map); unitsOn=true; const ub=document.getElementById('unitsBtn'); if(ub) ub.classList.add('active'); }
+  const ranked = UNITS.map(u=>{
+    const d=distKm(lat,lon,u.lat,u.lon);
+    const road=(u.t==='🚁'? d : d*1.25), speed=(u.t==='🚁'?160:55);
+    return {...u, d, eta:Math.max(1, Math.round(road/speed*60))};
+  }).sort((a,b)=>a.d-b.d).slice(0,3);
+  if(responseLayer) map.removeLayer(responseLayer);
+  responseLayer=L.layerGroup().addTo(map);
+  ranked.forEach((u,i)=>L.polyline([[u.lat,u.lon],[lat,lon]],{color:i===0?'#2ec36b':'#8ff6ff',weight:i===0?3.5:1.5,opacity:.85,dashArray:i===0?null:'6 7'}).addTo(responseLayer));
+
+  const nearHtml = ranked.map((u,i)=>`${i===0?'🥇 ':'• '}${u.t} ${u.n} — <b>${u.d.toFixed(1)} χλμ · ~${u.eta}′</b>`).join('<br>');
+  spreadFire.bindPopup(`🔥 <b>Σημείο φωτιάς</b><br>Άνεμος ${Math.round(wind)} χλμ/η από ${compass(wdir)}<br><b style="color:#ff7a3c">Εξάπλωση προς ${compass(toBear)}</b> (~${len.toFixed(0)} χλμ)<hr style="border:none;border-top:1px solid rgba(255,255,255,.15);margin:7px 0">🎯 <b>Πλησιέστερα μέσα:</b><br>${nearHtml}<br><span style="opacity:.6;font-size:11px">ETA εκτίμηση (δρόμος ~55 χλμ/η · εναέρια ~160).</span>`).openPopup();
+
+  const res=document.getElementById('spreadResult');
+  if(res) res.innerHTML = `<div class="srHead">🎯 Πλησιέστερα μέσα → χρόνος άφιξης</div>`+ranked.map((u,i)=>`<div class="srRow"><span>${i===0?'🥇':'&nbsp;&nbsp;&nbsp;'} ${u.t} ${u.n}</span><span class="srEta">${u.d.toFixed(1)} χλμ · ~${u.eta}′</span></div>`).join('');
 }
 
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----
