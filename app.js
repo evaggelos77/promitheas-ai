@@ -241,6 +241,19 @@ function promitheasSay(sorted){
   if(top.cat.idx>=4)      msg += `⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ κάθε χρήση φωτιάς στην ύπαιθρο. Αν δεις καπνό κάλεσε ΑΜΕΣΩΣ 199/112.`;
   else if(top.cat.idx===3)msg += `⚠️ Μην ανάβεις φωτιά/ψησταριά, απόφυγε εργασίες που βγάζουν σπίθα. Αναφορά καπνού → 199.`;
   else                    msg += `✅ Ήπιες συνθήκες. Πάντα προσοχή σε υπαίθριες φωτιές και σπινθήρες.`;
+  // Πρόβλεψη επόμενων ημερών
+  const fdays = sorted[0].forecast || [];
+  if(fdays.length>1){
+    const natCat = d => sorted.reduce((m,p)=>{ const f=p.forecast[d]; return f && f.cat.idx>m ? f.cat.idx : m; }, 1);
+    const todayC = natCat(0); let worst=todayC, worstD=0;
+    for(let d=1; d<Math.min(5,fdays.length); d++){ const c=natCat(d); if(c>worst){ worst=c; worstD=d; } }
+    if(worst>todayC){
+      const dt=new Date(fdays[worstD].date).toLocaleDateString('el-GR',{weekday:'long'});
+      msg += `\n📅 Προσοχή: ο κίνδυνος ανεβαίνει σε «${CAT[worst-1].label}» την ${dt}.`;
+    } else {
+      msg += `\n📅 Επόμενες μέρες: ο κίνδυνος παραμένει γύρω στο «${top.cat.label}».`;
+    }
+  }
   document.getElementById('aiSay').textContent = msg;
 }
 
