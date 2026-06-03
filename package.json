@@ -1,0 +1,9 @@
+{
+  "name": "promitheas-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ΠΡΟΜΗΘΕΑΣ AI — wildfire prevention & response platform for Greece, with GPT-4o operations advisor. EV LABS AI.",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": {}
+}

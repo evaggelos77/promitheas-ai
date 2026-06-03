@@ -54,8 +54,19 @@
 
     <aside class="panel">
       <div class="card promitheas">
-        <div class="cardHead"><span class="dot ai"></span><b>Ο ΠΡΟΜΗΘΕΑΣ λέει</b><small id="updTime" class="updTime"></small></div>
+        <div class="cardHead"><span class="dot ai"></span><b>🧠 Ρώτησε τον ΠΡΟΜΗΘΕΑ</b><small id="updTime" class="updTime"></small></div>
         <p id="aiSay" class="aiSay">Διαβάζω τον καιρό σε όλη την Ελλάδα…</p>
+        <div id="chatMsgs" class="chatMsgs"></div>
+        <div class="chatQuick">
+          <button class="qBtn" data-q="Πού είναι ο μεγαλύτερος κίνδυνος πυρκαγιάς αυτή τη στιγμή και γιατί;">Πού κινδυνεύουμε;</button>
+          <button class="qBtn" data-q="Έχω ταυτόχρονες φωτιές σε διαφορετικές περιοχές. Βοήθησέ με στην προτεραιότητα και την κατανομή των μέσων.">Πολλαπλές φωτιές</button>
+          <button class="qBtn" data-q="Τι μέτρα προφύλαξης πρέπει να πάρει ένας οικισμός κοντά σε δάσος σήμερα;">Προστασία οικισμού</button>
+        </div>
+        <div class="chatBar">
+          <input id="chatInput" type="text" placeholder="π.χ. «Στη Θήβα κινδυνεύουν οικισμοί;»" />
+          <button id="chatSend" aria-label="Αποστολή">➤</button>
+        </div>
+        <p class="muted small" id="aiStatus">🧠 AI εγκέφαλος GPT-4o — ενεργός στην πλήρη έκδοση (backend).</p>
       </div>
 
       <div class="card">

@@ -478,6 +478,51 @@ function openAuth(){
   document.getElementById('authView').hidden=false;
 }
 
+// ---- AI Chat: «Ρώτησε τον ΠΡΟΜΗΘΕΑ» (GPT-4o backend, grounded στα ζωντανά δεδομένα) ----
+let chatHistory = [];
+function buildContext(){
+  const p = LAST_POINTS;
+  if(!p.length) return 'Δεν έχουν φορτωθεί ακόμη δεδομένα.';
+  const top = p[0];
+  const high = p.filter(x=>x.cat.idx>=3).slice(0,12)
+    .map(x=>`${x.n}: κατ.${x.cat.idx} (${x.score}/100), ${x.temp}°C, υγρασία ${x.hum}%, άνεμος ${x.wind}χλμ/η ${compass(x.wdir)}`);
+  const days = Math.min(5,(top.forecast||[]).length);
+  const natFc = [];
+  for(let d=0; d<days; d++){ const mc = p.reduce((m,x)=>{ const f=x.forecast[d]; return f&&f.cat.idx>m?f.cat.idx:m; },1); natFc.push(`ημ${d}:κατ.${mc}`); }
+  const av=UNITS.filter(u=>u.s==='Διαθέσιμο').length, en=UNITS.filter(u=>u.s==='Καθ’ οδόν').length, on=UNITS.filter(u=>u.s==='Σε συμβάν').length;
+  return [
+    `Ημερομηνία: ${new Date().toLocaleDateString('el-GR')}.`,
+    `Εθνικός κίνδυνος: κατηγορία ${top.cat.idx}/5 (${top.cat.label}).`,
+    `Περιοχές αυξημένου κινδύνου (κατ.3+): ${high.length? high.join(' | ') : 'καμία αυτή τη στιγμή'}.`,
+    `Εθνική πρόβλεψη 5 ημερών (μέγιστη κατηγορία ανά ημέρα): ${natFc.join(', ')}.`,
+    `Πυροσβεστικά μέσα (δείγμα): σύνολο ${UNITS.length} — διαθέσιμα ${av}, καθ’ οδόν ${en}, σε συμβάν ${on}.`
+  ].join('\n');
+}
+function chatAdd(who, msg, cls){
+  const box=document.getElementById('chatMsgs'); if(!box) return null;
+  const d=document.createElement('div'); d.className='cMsg '+cls;
+  d.innerHTML = `<b>${who}</b> ${msg}`;
+  box.appendChild(d); box.scrollTop=box.scrollHeight; return d;
+}
+async function askPromitheas(text){
+  text=(text||'').trim(); if(!text) return;
+  const input=document.getElementById('chatInput'); if(input) input.value='';
+  chatAdd('Εσύ:', text.replace(/[<>]/g,''), 'cUser');
+  const thinking=chatAdd('ΠΡΟΜΗΘΕΑΣ:', '<span class="muted">σκέφτεται…</span>', 'cBot');
+  try{
+    const r=await fetch('api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:text, context:buildContext(), history:chatHistory})});
+    const d=await r.json();
+    if(d && d.ok && d.reply){
+      thinking.innerHTML=`<b>ΠΡΟΜΗΘΕΑΣ:</b> `+d.reply.replace(/[<>]/g,'').replace(/\n/g,'<br>');
+      chatHistory.push({role:'user',content:text},{role:'assistant',content:d.reply});
+      if(chatHistory.length>12) chatHistory=chatHistory.slice(-12);
+    } else { throw new Error((d&&d.error)||'no reply'); }
+  }catch(e){
+    thinking.innerHTML=`<b>ΠΡΟΜΗΘΕΑΣ:</b> <span class="muted">Ο AI εγκέφαλος (GPT-4o) θα είναι διαθέσιμος στην πλήρη έκδοση (backend στο Render). Σε λίγο online!</span>`;
+  }
+}
+
 // ---- Ρολόι ----
 function tick(){
   document.getElementById('clock').textContent =
@@ -495,6 +540,10 @@ async function boot(){
   document.getElementById('reportClose').onclick=()=>document.getElementById('reportModal').hidden=true;
   document.getElementById('reportSubmit').onclick=submitReport;
   const rs=document.getElementById('regSearch'); if(rs) rs.oninput=()=>searchRegions(rs.value);
+  const ci=document.getElementById('chatInput'), cs=document.getElementById('chatSend');
+  if(cs) cs.onclick=()=>askPromitheas(ci.value);
+  if(ci) ci.addEventListener('keydown', e=>{ if(e.key==='Enter') askPromitheas(ci.value); });
+  document.querySelectorAll('.qBtn').forEach(b=>b.onclick=()=>askPromitheas(b.dataset.q));
   document.getElementById('authBtn').onclick=openAuth;
   document.getElementById('authClose').onclick=()=>document.getElementById('authView').hidden=true;
   document.getElementById('unitsBtn').onclick=toggleUnits;

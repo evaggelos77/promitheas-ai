@@ -65,6 +65,20 @@ body{
 .cardHead .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .dot.ai{background:var(--ai); box-shadow:0 0 12px var(--ai)}
 .aiSay{margin:0; line-height:1.55; font-size:14.5px; white-space:pre-line}
+.chatMsgs{display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; margin:12px 0 0}
+.chatMsgs:empty{margin:0}
+.cMsg{padding:9px 12px; border-radius:13px; font-size:13.5px; line-height:1.5}
+.cUser{background:rgba(143,246,255,.12); align-self:flex-end; max-width:92%}
+.cBot{background:rgba(255,255,255,.06); border:1px solid var(--line); max-width:97%}
+.cMsg b{color:var(--ai)}
+.chatQuick{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+.qBtn{background:var(--panel2); border:1px solid var(--line2); color:var(--muted); border-radius:20px; padding:6px 11px; font-size:12px; cursor:pointer; transition:.13s}
+.qBtn:hover{border-color:var(--ai); color:var(--txt)}
+.chatBar{display:flex; gap:8px; margin-top:10px}
+.chatBar input{flex:1; padding:11px 13px; border-radius:11px; background:var(--bg); border:1px solid var(--line2); color:var(--txt); font-family:inherit; font-size:14px}
+.chatBar input:focus{outline:none; border-color:var(--ai); box-shadow:0 0 0 3px rgba(143,246,255,.15)}
+#chatSend{background:linear-gradient(135deg,#8ff6ff,#39d0e6); color:#04222a; border:none; border-radius:11px; padding:0 16px; font-size:18px; font-weight:800; cursor:pointer}
+#chatSend:hover{filter:brightness(1.08)}
 .muted{color:var(--muted); font-size:13px; line-height:1.5; margin:6px 0}
 .pill{background:var(--panel2); border:1px solid var(--line2); border-radius:20px; padding:3px 12px; font-size:13px; font-weight:700}
 .small{font-size:11.5px}
