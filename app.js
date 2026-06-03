@@ -523,6 +523,16 @@ async function askPromitheas(text){
   }
 }
 
+function toggleChatExpand(force){
+  const card=document.querySelector('.card.promitheas'); if(!card) return;
+  const bd=document.getElementById('chatBackdrop'), btn=document.getElementById('chatExpand');
+  const on = (force!==undefined) ? force : !card.classList.contains('expanded');
+  card.classList.toggle('expanded', on);
+  if(bd) bd.hidden = !on;
+  if(btn){ btn.textContent = on?'✕':'⛶'; btn.title = on?'Σμίκρυνση':'Μεγέθυνση κάδρου'; }
+  if(on){ const box=document.getElementById('chatMsgs'); if(box) box.scrollTop=box.scrollHeight; const ci=document.getElementById('chatInput'); if(ci) ci.focus(); }
+}
+
 // ---- Ρολόι ----
 function tick(){
   document.getElementById('clock').textContent =
@@ -544,6 +554,9 @@ async function boot(){
   if(cs) cs.onclick=()=>askPromitheas(ci.value);
   if(ci) ci.addEventListener('keydown', e=>{ if(e.key==='Enter') askPromitheas(ci.value); });
   document.querySelectorAll('.qBtn').forEach(b=>b.onclick=()=>askPromitheas(b.dataset.q));
+  const ce=document.getElementById('chatExpand'); if(ce) ce.onclick=()=>toggleChatExpand();
+  const cbd=document.getElementById('chatBackdrop'); if(cbd) cbd.onclick=()=>toggleChatExpand(false);
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') toggleChatExpand(false); });
   document.getElementById('authBtn').onclick=openAuth;
   document.getElementById('authClose').onclick=()=>document.getElementById('authView').hidden=true;
   document.getElementById('unitsBtn').onclick=toggleUnits;

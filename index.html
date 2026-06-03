@@ -54,7 +54,7 @@
 
     <aside class="panel">
       <div class="card promitheas">
-        <div class="cardHead"><span class="dot ai"></span><b>🧠 Ρώτησε τον ΠΡΟΜΗΘΕΑ</b><small id="updTime" class="updTime"></small></div>
+        <div class="cardHead"><span class="dot ai"></span><b>🧠 Ρώτησε τον ΠΡΟΜΗΘΕΑ</b><small id="updTime" class="updTime"></small><button id="chatExpand" class="chatExpand" title="Μεγέθυνση κάδρου" aria-label="Μεγέθυνση">⛶</button></div>
         <p id="aiSay" class="aiSay">Διαβάζω τον καιρό σε όλη την Ελλάδα…</p>
         <div id="chatMsgs" class="chatMsgs"></div>
         <div class="chatQuick">
@@ -113,6 +113,8 @@
       </div>
     </aside>
   </main>
+
+  <div id="chatBackdrop" class="chatBackdrop" hidden></div>
 
   <footer class="hqFooter">
     <span>Πηγές: Open-Meteo (καιρός) · NASA FIRMS (εστίες) · Copernicus EFFIS (δείκτης κινδύνου)</span>

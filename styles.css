@@ -79,6 +79,15 @@ body{
 .chatBar input:focus{outline:none; border-color:var(--ai); box-shadow:0 0 0 3px rgba(143,246,255,.15)}
 #chatSend{background:linear-gradient(135deg,#8ff6ff,#39d0e6); color:#04222a; border:none; border-radius:11px; padding:0 16px; font-size:18px; font-weight:800; cursor:pointer}
 #chatSend:hover{filter:brightness(1.08)}
+.chatExpand{margin-left:8px; background:var(--panel2); border:1px solid var(--line2); color:var(--ai); border-radius:9px; width:30px; height:30px; cursor:pointer; font-size:14px; line-height:1; flex:0 0 auto}
+.chatExpand:hover{border-color:var(--ai); filter:brightness(1.1)}
+.chatBackdrop{position:fixed; inset:0; background:rgba(4,7,12,.72); backdrop-filter:blur(3px); z-index:2400}
+.chatBackdrop[hidden]{display:none}
+.card.promitheas.expanded{position:fixed; top:3vh; left:50%; transform:translateX(-50%); width:min(900px,95vw); height:92vh; z-index:2500; display:flex; flex-direction:column; overflow:hidden}
+.card.promitheas.expanded .aiSay{flex:0 0 auto}
+.card.promitheas.expanded .chatMsgs{flex:1 1 auto; max-height:none}
+.card.promitheas.expanded .chatQuick,.card.promitheas.expanded .chatBar{flex:0 0 auto}
+.card.promitheas.expanded .cMsg{font-size:14.5px}
 .muted{color:var(--muted); font-size:13px; line-height:1.5; margin:6px 0}
 .pill{background:var(--panel2); border:1px solid var(--line2); border-radius:20px; padding:3px 12px; font-size:13px; font-weight:700}
 .small{font-size:11.5px}
