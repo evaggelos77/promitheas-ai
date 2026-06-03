@@ -257,34 +257,32 @@ function promitheasSay(sorted){
   document.getElementById('aiSay').textContent = msg;
 }
 
-// ---- NASA FIRMS (ενεργές εστίες) — προαιρετικό ----
-async function loadFires(){
+// ---- Ενεργές εστίες — EFFIS / Copernicus WMS (δημόσιο, ΧΩΡΙΣ κλειδί) ----
+let firesLayer = null, firesOn = true;
+function loadFires(){
   const pill = document.getElementById('firesPill');
   const note = document.getElementById('firesNote');
-  if(!FIRMS_MAP_KEY){
-    pill.textContent = 'off';
-    note.innerHTML = 'Δορυφορικός εντοπισμός (NASA FIRMS). Πρόσθεσε δωρεάν κλειδί στο <code>app.js</code> για ζωντανές εστίες.';
-    return;
-  }
   try{
-    // Greece bbox: west,south,east,north
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/VIIRS_SNPP_NRT/19.3,34.7,28.4,41.8/1`;
-    const txt = await (await fetch(url)).text();
-    const rows = txt.trim().split('\n'); const head = rows.shift().split(',');
-    const la=head.indexOf('latitude'), lo=head.indexOf('longitude'), cf=head.indexOf('confidence');
-    let n=0;
-    rows.forEach(line=>{
-      const c=line.split(','); if(c.length<3) return;
-      const lat=+c[la], lon=+c[lo]; if(!lat) return; n++;
-      L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:1,fillColor:'#ff2d00',fillOpacity:.9})
-        .addTo(markersLayer).bindPopup(`🔥 Ενεργή εστία (δορυφόρος)<br>Αξιοπιστία: ${c[cf]||'—'}`);
-    });
-    pill.textContent = n;
-    note.textContent = `${n} ενεργές εστίες (VIIRS, τελευταίες 24ω). Δορυφορικά δεδομένα έχουν καθυστέρηση ωρών.`;
+    if(!firesLayer){
+      firesLayer = L.tileLayer.wms('https://maps.effis.emergency.copernicus.eu/effis', {
+        layers:'all.hs', format:'image/png', transparent:true, version:'1.3.0',
+        opacity:0.95, attribution:'Εστίες: EFFIS / Copernicus'
+      });
+      firesLayer.on('tileerror', ()=>{ note.textContent='Το επίπεδο εστιών δεν αποκρίνεται προσωρινά.'; });
+    }
+    if(firesOn) firesLayer.addTo(map);
+    pill.textContent = firesOn ? 'ON' : 'OFF';
+    note.innerHTML = 'Ζωντανός δορυφορικός εντοπισμός φωτιάς (EFFIS/Copernicus — VIIRS &amp; MODIS, τελευταίες ώρες). Κόκκινα σημεία στον χάρτη όταν υπάρχουν εντοπισμοί.';
   }catch(e){
     pill.textContent='—';
-    note.textContent='Δεν φορτώθηκαν εστίες (έλεγξε το κλειδί FIRMS).';
+    note.textContent='Δεν φορτώθηκε το επίπεδο εστιών.';
   }
+}
+function toggleFires(){
+  if(!firesLayer){ loadFires(); return; }
+  firesOn = !firesOn;
+  if(firesOn) firesLayer.addTo(map); else map.removeLayer(firesLayer);
+  document.getElementById('firesPill').textContent = firesOn ? 'ON' : 'OFF';
 }
 
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----
@@ -406,6 +404,7 @@ async function boot(){
   const rs=document.getElementById('regSearch'); if(rs) rs.oninput=()=>searchRegions(rs.value);
   document.getElementById('authBtn').onclick=openAuth;
   document.getElementById('authClose').onclick=()=>document.getElementById('authView').hidden=true;
+  document.getElementById('firesToggle').onclick=toggleFires;
 
   async function refresh(){
     const load=document.getElementById('loadingMap'); load.style.display='flex';
