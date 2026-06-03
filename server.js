@@ -28,6 +28,7 @@ const ROOT = __dirname;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.AI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+const FIRMS_MAP_KEY = process.env.FIRMS_MAP_KEY || '';
 
 // ---- Ο εγκέφαλος: εκπαιδευμένος σαν αξιωματικός Πυροσβεστικής / Πολιτικής Προστασίας ----
 const SYSTEM = [
@@ -73,6 +74,29 @@ async function promitheasReply(message, context, history) {
   return { reply: reply || 'Δεν μπόρεσα να επεξεργαστώ το αίτημα. Δοκίμασε ξανά.', powered: true };
 }
 
+// ---- NASA FIRMS: πραγματικές ενεργές εστίες (server-side, το κλειδί ΔΕΝ φτάνει στον browser) ----
+let firesCache = { t: 0, data: null };
+async function fetchFires(){
+  if(!FIRMS_MAP_KEY) return { ok:true, powered:false, fires:[], count:0 };
+  if(firesCache.data && (Date.now() - firesCache.t) < 5*60*1000) return firesCache.data; // cache 5'
+  const area = '19.3,34.7,28.4,41.8'; // Ελλάδα: west,south,east,north
+  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/VIIRS_SNPP_NRT/${area}/1`;
+  const res = await fetch(url);
+  const txt = await res.text();
+  const rows = txt.trim().split(/\r?\n/);
+  const head = (rows.shift()||'').split(',');
+  const iLat=head.indexOf('latitude'), iLon=head.indexOf('longitude'), iConf=head.indexOf('confidence'), iDate=head.indexOf('acq_date'), iTime=head.indexOf('acq_time'), iFrp=head.indexOf('frp');
+  const fires=[];
+  for(const line of rows){
+    const c=line.split(','); if(c.length<3) continue;
+    const lat=+c[iLat], lon=+c[iLon]; if(!lat||!lon) continue;
+    fires.push({ lat, lon, conf:(iConf>=0?c[iConf]:''), date:(iDate>=0?c[iDate]:''), time:(iTime>=0?c[iTime]:''), frp:(iFrp>=0?+c[iFrp]:0)||0 });
+  }
+  const out = { ok:true, powered:true, fires, count:fires.length };
+  firesCache = { t: Date.now(), data: out };
+  return out;
+}
+
 // ---- helpers ----
 function commonHeaders(extra = {}) {
   return { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type',
@@ -116,6 +140,8 @@ function handleApi(req, res, url) {
         sendJson(res, 200, { ok: true, ...out });
       } catch (e) { sendJson(res, 200, { ok: false, error: 'AI error: ' + e.message }); }
     }).catch(e => sendJson(res, 500, { ok: false, error: e.message }));
+  if (req.method === 'GET' && p === '/api/fires')
+    return fetchFires().then(d => sendJson(res, 200, d)).catch(e => sendJson(res, 200, { ok:false, error:e.message, fires:[] }));
   return false;
 }
 

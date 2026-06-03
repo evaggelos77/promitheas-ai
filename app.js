@@ -417,6 +417,28 @@ function demoAlert(){
   fireAlert(p.lat, p.lon, `${p.n} (κατ.${p.cat.idx}) — δορυφορικός εντοπισμός [demo]`);
 }
 
+// ---- Αυτόματος έλεγχος ΠΡΑΓΜΑΤΙΚΩΝ εστιών (NASA FIRMS μέσω backend) + auto-συναγερμός ----
+let seenFires=new Set(), realFireLayer=null, firstFireLoad=true;
+async function loadRealFires(){
+  try{
+    const d = await (await fetch('api/fires')).json();
+    const pill=document.getElementById('firesLivePill');
+    if(!d || !d.ok || !d.powered){ if(pill) pill.textContent='—'; return; }
+    if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
+    realFireLayer.clearLayers();
+    const fresh=[];
+    (d.fires||[]).forEach(f=>{
+      const id=f.lat.toFixed(3)+','+f.lon.toFixed(3)+','+(f.time||'');
+      if(!seenFires.has(id)){ seenFires.add(id); if(!firstFireLoad) fresh.push(f); }
+      L.circleMarker([f.lat,f.lon],{radius:7,color:'#fff',weight:1,fillColor:'#ff2d00',fillOpacity:.95})
+        .addTo(realFireLayer).bindPopup(`🔥 Ενεργή εστία (δορυφόρος VIIRS)<br>Αξιοπιστία: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
+    });
+    if(pill) pill.textContent = d.count;
+    if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)`); }
+    firstFireLoad=false;
+  }catch(e){ /* χωρίς backend → αγνόησε */ }
+}
+
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----
 function safeExit(){
   const box = document.getElementById('safeBox');
@@ -612,6 +634,7 @@ async function boot(){
   }
   await refresh();
   initLayers();
+  loadRealFires(); setInterval(loadRealFires, 5*60*1000);
   setInterval(refresh, REFRESH_MS);
 }
 document.addEventListener('DOMContentLoaded', boot);
