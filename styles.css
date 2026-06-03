@@ -38,7 +38,7 @@ body{
 .byEv{font-size:12px;color:var(--muted)} .byEv strong{color:var(--ai)}
 
 /* ---------- HQ layout ---------- */
-.hq{flex:1; display:grid; grid-template-columns:1fr 400px; gap:0; min-height:0}
+.hq{flex:1; display:grid; grid-template-columns:1fr 440px; gap:0; min-height:0}
 .mapWrap{position:relative; min-height:520px}
 #map{position:absolute; inset:0; background:#0a0f17}
 .loadingMap{position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:600;
@@ -57,10 +57,10 @@ body{
 
 /* ---------- Panel ---------- */
 .panel{background:linear-gradient(180deg,var(--bg2),var(--bg)); border-left:1px solid var(--line2);
-  padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; max-height:calc(100vh - 64px)}
-.card{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:16px}
+  padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; max-height:calc(100vh - 64px)}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:20px}
 .card.promitheas{background:linear-gradient(180deg,rgba(143,246,255,.08),rgba(143,246,255,.02)); border-color:rgba(143,246,255,.30); box-shadow:0 0 40px rgba(143,246,255,.08)}
-.cardHead{display:flex; align-items:center; gap:9px; margin-bottom:10px; justify-content:space-between}
+.cardHead{display:flex; align-items:center; gap:9px; margin-bottom:14px; justify-content:space-between}
 .cardHead b{font-size:15px}
 .cardHead .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .dot.ai{background:var(--ai); box-shadow:0 0 12px var(--ai)}
