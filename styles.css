@@ -24,6 +24,7 @@ body{
 }
 .brandHQ{display:flex; align-items:center; gap:14px}
 .flame{font-size:34px; filter:drop-shadow(0 0 14px rgba(255,90,31,.6)); animation:flick 2.4s infinite}
+.brandLogo{height:50px; width:auto; border-radius:10px; filter:drop-shadow(0 0 10px rgba(255,90,31,.45))}
 @keyframes flick{0%,100%{transform:translateY(0) scale(1);opacity:1}50%{transform:translateY(-1px) scale(1.06);opacity:.9}}
 .brandHQtext strong{font-size:21px; letter-spacing:.5px; display:block; line-height:1.1}
 .brandHQtext .ai{color:var(--ai)}
