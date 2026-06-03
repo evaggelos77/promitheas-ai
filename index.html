@@ -94,8 +94,9 @@
         <div class="layerBtns">
           <button class="layerBtn" id="unitsBtn">🚒 Πυροσβεστικά μέσα</button>
           <button class="layerBtn" id="spreadBtn">🔥 Προσομοίωση εξάπλωσης</button>
+          <button class="layerBtn" id="alarmBtn">🚨 Δοκιμή συναγερμού</button>
         </div>
-        <p class="muted small" style="margin-top:10px">🚒 Μέσα = <b>δείγμα</b> (συνδέεται με πραγματικό στόλο/AVL Πυροσβεστικής). 🔥 Εξάπλωση: πάτα το κουμπί &amp; κάνε κλικ σε σημείο — δείχνει εξάπλωση + <b>3 κοντινότερα μέσα & χρόνο άφιξης</b>.</p>
+        <p class="muted small" style="margin-top:10px">🚒 Μέσα = <b>δείγμα</b> (συνδέεται με πραγματικό στόλο/AVL). 🔥 Εξάπλωση: κλικ σε σημείο → 3 κοντινότερα μέσα & χρόνος άφιξης. 🚨 Συναγερμός: ήχος + animation στον χάρτη — σε πλήρη σύνδεση <b>ενεργοποιείται αυτόματα από δορυφορικό εντοπισμό</b>.</p>
         <div id="spreadResult" class="spreadResult"></div>
       </div>
 
@@ -115,6 +116,7 @@
   </main>
 
   <div id="chatBackdrop" class="chatBackdrop" hidden></div>
+  <div id="alertBanner" class="alertBanner" hidden></div>
 
   <footer class="hqFooter">
     <span>Πηγές: Open-Meteo (καιρός) · NASA FIRMS (εστίες) · Copernicus EFFIS (δείκτης κινδύνου)</span>

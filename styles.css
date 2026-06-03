@@ -189,6 +189,18 @@ body{
 .srRow{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--line); font-size:13px}
 .srEta{color:var(--ai); font-weight:700; white-space:nowrap}
 
+/* 🚨 Συναγερμός: banner + παλλόμενη animation */
+.alertBanner{position:fixed; top:72px; left:50%; transform:translateX(-50%); z-index:3200;
+  background:linear-gradient(135deg,#ff3b30,#a3000b); color:#fff; padding:13px 18px; border-radius:14px;
+  font-size:15px; font-weight:600; box-shadow:0 16px 44px rgba(255,30,20,.45); display:flex; align-items:center; gap:14px; max-width:92vw}
+.alertBanner[hidden]{display:none}
+.alertBanner button{background:rgba(255,255,255,.22); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:13px; flex:0 0 auto}
+.alertPulse{position:relative; display:flex; align-items:center; justify-content:center}
+.alertPulse i{font-style:normal; font-size:20px; z-index:2; filter:drop-shadow(0 0 5px #ff3b30)}
+.alertPulse span{position:absolute; left:50%; top:50%; width:14px; height:14px; border-radius:50%; background:rgba(255,59,48,.55); transform:translate(-50%,-50%); animation:ringPulse 1.6s ease-out infinite}
+.alertPulse span:nth-child(2){animation-delay:.8s}
+@keyframes ringPulse{0%{width:14px;height:14px;opacity:.85}100%{width:74px;height:74px;opacity:0}}
+
 /* ---------- Mobile ---------- */
 @media(max-width:900px){
   .hq{grid-template-columns:1fr; grid-template-rows:auto auto}

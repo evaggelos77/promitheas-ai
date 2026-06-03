@@ -267,13 +267,20 @@ function promitheasSay(sorted){
 // ---- Επίπεδα χάρτη — EFFIS / Copernicus WMS (δημόσιο, ΧΩΡΙΣ κλειδί) ----
 const EFFIS_WMS = 'https://maps.effis.emergency.copernicus.eu/effis';
 const todayISO = () => new Date().toISOString().slice(0,10);
+const yesterdayISO = () => new Date(Date.now()-86400000).toISOString().slice(0,10);
 const LAYER_DEFS = {
   fires: {layers:'all.hs',               label:'🛰️ Ενεργές εστίες',      on:true,  opacity:0.95},
   fwi:   {layers:'mf010.fwi',            label:'🔥 Επικινδυνότητα (FWI)', on:false, opacity:0.55, time:true},
-  burnt: {layers:'modis.ba.poly.season', label:'🌳 Καμένες φέτος',        on:false, opacity:0.6}
+  burnt: {layers:'modis.ba.poly.season', label:'🌳 Καμένες φέτος',        on:false, opacity:0.6},
+  sat:   {label:'🛰️ Δορυφορική εικόνα', on:false, opacity:1, maxNativeZoom:16, attr:'Sentinel-2 cloudless · EOX',
+          xyz:'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/g/{z}/{y}/{x}.jpg'}
 };
 const wmsLayers = {};
 function makeWms(def){
+  if(def.xyz){
+    return L.tileLayer(def.xyz.replace('{DATE}', yesterdayISO()),
+      {maxNativeZoom:def.maxNativeZoom||8, maxZoom:18, opacity:def.opacity||1, attribution:def.attr||'Δορυφόρος'});
+  }
   const opts = {layers:def.layers, format:'image/png', transparent:true, version:'1.3.0', opacity:def.opacity, attribution:'EFFIS / Copernicus'};
   if(def.time) opts.time = todayISO();
   return L.tileLayer.wms(EFFIS_WMS, opts);
@@ -375,6 +382,39 @@ async function simulateSpread(lat,lon){
 
   const res=document.getElementById('spreadResult');
   if(res) res.innerHTML = `<div class="srHead">🎯 Πλησιέστερα μέσα → χρόνος άφιξης</div>`+ranked.map((u,i)=>`<div class="srRow"><span>${i===0?'🥇':'&nbsp;&nbsp;&nbsp;'} ${u.t} ${u.n}</span><span class="srEta">${u.d.toFixed(1)} χλμ · ~${u.eta}′</span></div>`).join('');
+}
+
+// ---- 🚨 Σύστημα συναγερμού: ήχος σειρήνας + animation στον χάρτη + banner ----
+let audioCtx=null, alertLayer=null;
+function playSiren(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=audioCtx; if(ctx.state==='suspended') ctx.resume();
+    const t0=ctx.currentTime;
+    for(let i=0;i<3;i++){ const o=ctx.createOscillator(), g=ctx.createGain(); const s=t0+i*0.5;
+      o.type='sine'; o.frequency.setValueAtTime(900,s); o.frequency.linearRampToValueAtTime(460,s+0.4);
+      g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.25,s+0.05); g.gain.exponentialRampToValueAtTime(0.0001,s+0.46);
+      o.connect(g); g.connect(ctx.destination); o.start(s); o.stop(s+0.5); }
+  }catch(e){}
+}
+function fireAlert(lat, lon, title, withSound){
+  const bn=document.getElementById('alertBanner');
+  if(bn){
+    bn.innerHTML = `🚨 <span><b>ΣΥΝΑΓΕΡΜΟΣ ΦΩΤΙΑΣ</b> — ${String(title||'').replace(/[<>]/g,'')}</span> <button aria-label="Κλείσιμο">✕</button>`;
+    bn.hidden=false;
+    bn.querySelector('button').onclick=()=>{ bn.hidden=true; };
+    clearTimeout(window.__alertT); window.__alertT=setTimeout(()=>{ bn.hidden=true; }, 10000);
+  }
+  if(withSound!==false) playSiren();
+  if(!alertLayer) alertLayer=L.layerGroup().addTo(map);
+  const m=L.marker([lat,lon],{icon:L.divIcon({className:'alertPulse',html:'<span></span><span></span><i>🔥</i>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:1000}).addTo(alertLayer);
+  setTimeout(()=>{ try{ alertLayer.removeLayer(m); }catch(e){} }, 30000);
+  map.setView([lat,lon], Math.max(map.getZoom(), 8));
+}
+function demoAlert(){
+  const p=LAST_POINTS[0];
+  if(!p){ fireAlert(38.32,23.32,'Θήβα — δοκιμή'); return; }
+  fireAlert(p.lat, p.lon, `${p.n} (κατ.${p.cat.idx}) — δορυφορικός εντοπισμός [demo]`);
 }
 
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----
@@ -561,6 +601,7 @@ async function boot(){
   document.getElementById('authClose').onclick=()=>document.getElementById('authView').hidden=true;
   document.getElementById('unitsBtn').onclick=toggleUnits;
   document.getElementById('spreadBtn').onclick=()=>setSpreadMode(!spreadMode);
+  var ab=document.getElementById('alarmBtn'); if(ab) ab.onclick=demoAlert;
   map.on('click', e=>{ if(spreadMode){ simulateSpread(e.latlng.lat, e.latlng.lng); setSpreadMode(false); } });
 
   async function refresh(){
