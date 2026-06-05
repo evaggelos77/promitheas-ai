@@ -39,7 +39,7 @@ body{
 .byEv{font-size:12px;color:var(--muted)} .byEv strong{color:var(--ai)}
 
 /* ---------- HQ layout ---------- */
-.hq{flex:1; display:grid; grid-template-columns:1fr 440px; gap:0; min-height:0}
+.hq{flex:1; display:grid; grid-template-columns:minmax(0,1fr) clamp(470px,38vw,690px); gap:0; min-height:0}
 .mapWrap{position:relative; min-height:520px}
 #map{position:absolute; inset:0; background:#0a0f17}
 .loadingMap{position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:600;
@@ -62,6 +62,43 @@ body{
 .card{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:20px}
 .card.promitheas{background:linear-gradient(180deg,rgba(143,246,255,.08),rgba(143,246,255,.02)); border-color:rgba(143,246,255,.30); box-shadow:0 0 40px rgba(143,246,255,.08)}
 .cardHead{display:flex; align-items:center; gap:9px; margin-bottom:14px; justify-content:space-between}
+
+/* ---------- Μηχανές AI · βαρόμετρα ζωντανής κατάστασης ---------- */
+.aiEngines{background:linear-gradient(180deg,rgba(255,90,31,.08),rgba(143,246,255,.03)); border-color:rgba(255,150,90,.30); box-shadow:0 0 40px rgba(255,90,31,.06)}
+.liveTag{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; letter-spacing:.6px; color:#2ec36b}
+.aiGaugeWrap{display:flex; align-items:center; gap:18px; margin-bottom:16px}
+.aiGauge{width:150px; height:auto; flex:0 0 auto}
+.gaugeBg{stroke:rgba(255,255,255,.10)}
+#gaugeNeedle{transition:x2 .7s cubic-bezier(.34,1.4,.5,1), y2 .7s cubic-bezier(.34,1.4,.5,1); stroke:var(--fire)}
+.gaugeReadout{display:flex; flex-direction:column; gap:3px}
+.gaugeReadout b{font-size:38px; font-weight:800; line-height:.95}
+.gaugeReadout small{font-size:12px; color:var(--muted); font-weight:700}
+.gaugeReadout span{font-size:13px; font-weight:800}
+.engList{display:flex; flex-direction:column; gap:9px}
+.eng{display:flex; align-items:center; gap:11px; padding:10px 12px; background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:12px}
+.engDot{width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:#5b6675}
+.engDot.on{background:#2ec36b; box-shadow:0 0 9px #2ec36b; animation:pulse 1.8s infinite}
+.engDot.warn{background:#ffd23f; box-shadow:0 0 9px #ffd23f}
+.engName{font-size:13px; flex:1; color:var(--muted)}
+.engName b{color:var(--txt)}
+.engMeta{font-size:11.5px; color:var(--muted); font-weight:800; text-align:right; white-space:nowrap}
+.engMeta.live{color:#7be0a0; animation:livePulse 2.6s ease-in-out infinite}
+@keyframes livePulse{0%,100%{opacity:1}50%{opacity:.62}}
+/* διακριτική «ζωντανή» κίνηση στα βαρόμετρα */
+#needleSway{transform-box:view-box; transform-origin:100px 102px; animation:needleSway 4.2s ease-in-out infinite}
+@keyframes needleSway{0%,100%{transform:rotate(-1.3deg)}50%{transform:rotate(1.3deg)}}
+.gaugeArc{animation:arcBreathe 3.8s ease-in-out infinite}
+@keyframes arcBreathe{0%,100%{opacity:.95}50%{opacity:.74}}
+/* μικρό βαρόμετρο ανά μηχανή AI — animated equalizer = «δουλεύει ζωντανά» */
+.meter{display:inline-flex; align-items:flex-end; gap:2px; height:16px; width:21px; flex:0 0 auto}
+.meter i{width:3.5px; height:35%; background:#5b6675; border-radius:1px}
+.meter.on i{background:#2ec36b; box-shadow:0 0 6px rgba(46,195,107,.45); animation:eqbar 1s ease-in-out infinite}
+.meter.on i:nth-child(2){animation-delay:.22s}
+.meter.on i:nth-child(3){animation-delay:.44s}
+.meter.on i:nth-child(4){animation-delay:.13s}
+.meter.warn i{background:#ffd23f; height:30%}
+@keyframes eqbar{0%,100%{height:28%}50%{height:96%}}
+.fcScore{display:block; font-size:9.5px; color:var(--muted); font-weight:800; margin-top:3px}
 .cardHead b{font-size:15px}
 .cardHead .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .dot.ai{background:var(--ai); box-shadow:0 0 12px var(--ai)}

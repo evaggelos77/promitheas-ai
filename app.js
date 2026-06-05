@@ -88,13 +88,19 @@ function distKm(la1,lo1,la2,lo2){
 }
 
 // ---- Υπολογισμός δείκτη κινδύνου (0-100) από ζωντανό καιρό ----
+// ΚΥΡΙΟ: trained ML μοντέλο (gradient-boosting στο επιστημονικό Fire Weather Index / EFFIS),
+// βλ. fire_model.js. Πιάνει μη-γραμμικές αλληλεπιδράσεις (άνεμος × ξηρασία × θερμοκρασία).
 function fireRisk({temp,hum,wind,rain3}){
-  const t = clamp((temp-22)/16, 0,1);   // 22°C→0, 38°C→1
-  const h = clamp((45-hum)/35, 0,1);    // 45%→0, 10%→1 (ξηρό = κίνδυνος)
-  const w = clamp((wind-10)/45, 0,1);   // 10→0, 55 χλμ/η→1
-  const d = clamp((8-rain3)/8, 0,1);    // 8mm+ βροχή→0, 0mm→1
-  const score = 100*(0.28*t + 0.24*h + 0.30*w + 0.18*d);
-  return Math.round(score);
+  if (typeof window.fireRiskML === 'function') {
+    const v = window.fireRiskML(temp, hum, wind, rain3);
+    if (v != null && !isNaN(v)) return v;
+  }
+  // Fallback: απλή γραμμική ευρετική (αν δεν φορτώθηκε το μοντέλο)
+  const t = clamp((temp-22)/16, 0,1);
+  const h = clamp((45-hum)/35, 0,1);
+  const w = clamp((wind-10)/45, 0,1);
+  const d = clamp((8-rain3)/8, 0,1);
+  return Math.round(100*(0.28*t + 0.24*h + 0.30*w + 0.18*d));
 }
 
 // ---- Χάρτης ----
@@ -175,11 +181,40 @@ function render(points){
   document.getElementById('natRisk').style.boxShadow = `0 0 24px ${top.cat.color}55`;
 
   LAST_POINTS = sorted;
+  updateAIEngines(sorted, top);
   renderList(sorted.slice(0,8));
   setStatusStrip(top);
   renderForecast(sorted);
   const ut=document.getElementById('updTime'); if(ut) ut.textContent='ανανέωση '+new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
   promitheasSay(sorted);
+}
+
+// ---- Μηχανές AI: βαρόμετρα ζωντανής κατάστασης (αληθινά μετρικά) ----
+function setGauge(score, cat){
+  score = Math.max(0, Math.min(100, Math.round(score||0)));
+  const th = (180 - (score/100)*180) * Math.PI/180;
+  const n = document.getElementById('gaugeNeedle');
+  if(n){ n.setAttribute('x2', (100+74*Math.cos(th)).toFixed(1)); n.setAttribute('y2', (102-74*Math.sin(th)).toFixed(1)); if(cat) n.style.stroke = cat.color; }
+  const v = document.getElementById('gaugeVal'); if(v){ v.textContent = score; if(cat) v.style.color = cat.color; }
+  const c = document.getElementById('gaugeCat'); if(c && cat){ c.textContent = cat.idx+' · '+cat.label; c.style.color = cat.color; }
+}
+function updateAIEngines(points, top){
+  if(top && top.cat) setGauge(top.score, top.cat);
+  const n = (points||[]).length;
+  const trees = (window.PROMETHEAS_FIRE_MODEL && window.PROMETHEAS_FIRE_MODEL.trees) ? window.PROMETHEAS_FIRE_MODEL.trees.length : 0;
+  const mML = document.getElementById('mML'); if(mML) mML.textContent = (trees? trees+' δέντρα · ' : '') + n + ' περιοχές';
+  const dML = document.getElementById('dML'); if(dML) dML.className = 'meter ' + (trees? 'on':'warn');
+  const mMeteo = document.getElementById('mMeteo');
+  if(mMeteo) mMeteo.textContent = n + ' περιοχές · ' + new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
+}
+async function checkAIBrain(){
+  const d = document.getElementById('dGPT'), m = document.getElementById('mGPT');
+  try{
+    const h = await (await fetch('api/health')).json();
+    const on = !!(h && h.ai && h.ai.powered);
+    if(d) d.className = 'meter ' + (on? 'on':'warn');
+    if(m){ m.textContent = on ? 'ενεργός · συνδεδεμένος' : 'τοπική προβολή'; m.className = 'engMeta'+(on?' live':''); }
+  }catch(e){ if(d) d.className='engDot warn'; if(m) m.textContent='τοπική προβολή'; }
 }
 
 // ---- Λίστα περιοχών + αναζήτηση δήμου ----
@@ -224,11 +259,14 @@ function renderForecast(points){
   const days=Math.min(5, points[0].forecast.length);
   let html='';
   for(let d=0; d<days; d++){
-    const maxCat=points.reduce((m,p)=>{ const f=p.forecast[d]; return f && f.cat.idx>m ? f.cat.idx : m; }, 1);
-    const c=CAT[maxCat-1];
+    // Εθνικός ΜΕΣΟΣ δείκτης ανά ημέρα (όχι η χειρότερη περιοχή — αλλιώς πάντα κόκκινο/πανικός)
+    let sum=0, cnt=0;
+    points.forEach(p=>{ const f=p.forecast[d]; if(f){ sum+=f.score; cnt++; } });
+    const avg=cnt?Math.round(sum/cnt):0;
+    const cat=categoryOf(avg);
     const dt=new Date(points[0].forecast[d].date);
     const lbl = d===0?'Σήμ.' : d===1?'Αύρ.' : dt.toLocaleDateString('el-GR',{weekday:'short'}).replace('.','');
-    html+=`<div class="fcDay"><span class="fcLbl">${lbl}</span><span class="fcDot" style="background:${c.color}">${maxCat}</span></div>`;
+    html+=`<div class="fcDay"><span class="fcLbl">${lbl}</span><span class="fcDot" style="background:${cat.color}">${cat.idx}</span><span class="fcScore">${avg}/100</span></div>`;
   }
   el.innerHTML=html;
 }
@@ -248,17 +286,17 @@ function promitheasSay(sorted){
   if(top.cat.idx>=4)      msg += `⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ κάθε χρήση φωτιάς στην ύπαιθρο. Αν δεις καπνό κάλεσε ΑΜΕΣΩΣ 199/112.`;
   else if(top.cat.idx===3)msg += `⚠️ Μην ανάβεις φωτιά/ψησταριά, απόφυγε εργασίες που βγάζουν σπίθα. Αναφορά καπνού → 199.`;
   else                    msg += `✅ Ήπιες συνθήκες. Πάντα προσοχή σε υπαίθριες φωτιές και σπινθήρες.`;
-  // Πρόβλεψη επόμενων ημερών
+  // Πρόβλεψη επόμενων ημερών (εθνικός ΜΕΣΟΣ δείκτης — συνεπές με την 5ήμερη)
   const fdays = sorted[0].forecast || [];
   if(fdays.length>1){
-    const natCat = d => sorted.reduce((m,p)=>{ const f=p.forecast[d]; return f && f.cat.idx>m ? f.cat.idx : m; }, 1);
+    const natCat = d => { let s=0,n=0; sorted.forEach(p=>{const f=p.forecast[d]; if(f){s+=f.score;n++;}}); return n? categoryOf(Math.round(s/n)).idx : 1; };
     const todayC = natCat(0); let worst=todayC, worstD=0;
     for(let d=1; d<Math.min(5,fdays.length); d++){ const c=natCat(d); if(c>worst){ worst=c; worstD=d; } }
     if(worst>todayC){
       const dt=new Date(fdays[worstD].date).toLocaleDateString('el-GR',{weekday:'long'});
-      msg += `\n📅 Προσοχή: ο κίνδυνος ανεβαίνει σε «${CAT[worst-1].label}» την ${dt}.`;
+      msg += `\n📅 Προσοχή: ο μέσος εθνικός κίνδυνος ανεβαίνει σε «${CAT[worst-1].label}» την ${dt}.`;
     } else {
-      msg += `\n📅 Επόμενες μέρες: ο κίνδυνος παραμένει γύρω στο «${top.cat.label}».`;
+      msg += `\n📅 Επόμενες μέρες: ο μέσος εθνικός κίνδυνος παραμένει γύρω στο «${CAT[todayC-1].label}».`;
     }
   }
   document.getElementById('aiSay').textContent = msg;
@@ -423,7 +461,10 @@ async function loadRealFires(){
   try{
     const d = await (await fetch('api/fires')).json();
     const pill=document.getElementById('firesLivePill');
-    if(!d || !d.ok || !d.powered){ if(pill) pill.textContent='—'; return; }
+    if(!d || !d.ok || !d.powered){ if(pill) pill.textContent='—';
+      var dF0=document.getElementById('dFIRMS'), mF0=document.getElementById('mFIRMS');
+      if(dF0) dF0.className='meter warn'; if(mF0) mF0.textContent='σε αναμονή κλειδιού';
+      return; }
     if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
     realFireLayer.clearLayers();
     const fresh=[];
@@ -434,6 +475,8 @@ async function loadRealFires(){
         .addTo(realFireLayer).bindPopup(`🔥 Ενεργή εστία (δορυφόρος VIIRS)<br>Αξιοπιστία: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
     });
     if(pill) pill.textContent = d.count;
+    var dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
+    if(dF) dF.className='meter on'; if(mF){ mF.textContent=(d.count>0? d.count+' ενεργές':'0 — καθαρά'); mF.className='engMeta live'; }
     if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)`); }
     firstFireLoad=false;
   }catch(e){ /* χωρίς backend → αγνόησε */ }
@@ -581,7 +624,7 @@ async function askPromitheas(text){
       if(chatHistory.length>12) chatHistory=chatHistory.slice(-12);
     } else { throw new Error((d&&d.error)||'no reply'); }
   }catch(e){
-    thinking.innerHTML=`<b>ΠΡΟΜΗΘΕΑΣ:</b> <span class="muted">Ο AI εγκέφαλος (GPT-4o) θα είναι διαθέσιμος στην πλήρη έκδοση (backend στο Render). Σε λίγο online!</span>`;
+    thinking.innerHTML=`<b>ΠΡΟΜΗΘΕΑΣ:</b> <span class="muted">Ο Εγκέφαλος ΠΡΟΜΗΘΕΑΣ θα είναι διαθέσιμος στην πλήρη έκδοση (backend στο Render). Σε λίγο online!</span>`;
   }
 }
 
@@ -635,6 +678,7 @@ async function boot(){
   await refresh();
   initLayers();
   loadRealFires(); setInterval(loadRealFires, 5*60*1000);
+  checkAIBrain(); setInterval(checkAIBrain, 5*60*1000);
   setInterval(refresh, REFRESH_MS);
 }
 document.addEventListener('DOMContentLoaded', boot);
