@@ -75,22 +75,29 @@ async function promitheasReply(message, context, history) {
 }
 
 // ---- NASA FIRMS: πραγματικές ενεργές εστίες (server-side, το κλειδί ΔΕΝ φτάνει στον browser) ----
+// Συνδυάζουμε πολλαπλούς δορυφόρους VIIRS (NOAA-20 + SNPP) για μέγιστη κάλυψη και dedupe.
+const FIRMS_SOURCES = [['VIIRS_NOAA20_NRT','NOAA-20'], ['VIIRS_SNPP_NRT','SNPP']];
 let firesCache = { t: 0, data: null };
 async function fetchFires(){
   if(!FIRMS_MAP_KEY) return { ok:true, powered:false, fires:[], count:0 };
   if(firesCache.data && (Date.now() - firesCache.t) < 5*60*1000) return firesCache.data; // cache 5'
   const area = '19.3,34.7,28.4,41.8'; // Ελλάδα: west,south,east,north
-  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/VIIRS_SNPP_NRT/${area}/1`;
-  const res = await fetch(url);
-  const txt = await res.text();
-  const rows = txt.trim().split(/\r?\n/);
-  const head = (rows.shift()||'').split(',');
-  const iLat=head.indexOf('latitude'), iLon=head.indexOf('longitude'), iConf=head.indexOf('confidence'), iDate=head.indexOf('acq_date'), iTime=head.indexOf('acq_time'), iFrp=head.indexOf('frp');
-  const fires=[];
-  for(const line of rows){
-    const c=line.split(','); if(c.length<3) continue;
-    const lat=+c[iLat], lon=+c[iLon]; if(!lat||!lon) continue;
-    fires.push({ lat, lon, conf:(iConf>=0?c[iConf]:''), date:(iDate>=0?c[iDate]:''), time:(iTime>=0?c[iTime]:''), frp:(iFrp>=0?+c[iFrp]:0)||0 });
+  const seen = new Set(), fires = [];
+  for(const [prod, label] of FIRMS_SOURCES){
+    try{
+      const res = await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/${prod}/${area}/1`);
+      if(!res.ok) continue;
+      const txt = await res.text();
+      const rows = txt.trim().split(/\r?\n/);
+      const head = (rows.shift()||'').split(',');
+      const iLat=head.indexOf('latitude'), iLon=head.indexOf('longitude'), iConf=head.indexOf('confidence'), iDate=head.indexOf('acq_date'), iTime=head.indexOf('acq_time'), iFrp=head.indexOf('frp');
+      for(const line of rows){
+        const c=line.split(','); if(c.length<3) continue;
+        const lat=+c[iLat], lon=+c[iLon]; if(!lat||!lon) continue;
+        const k=lat.toFixed(3)+','+lon.toFixed(3); if(seen.has(k)) continue; seen.add(k);
+        fires.push({ lat, lon, conf:(iConf>=0?c[iConf]:''), date:(iDate>=0?c[iDate]:''), time:(iTime>=0?c[iTime]:''), frp:(iFrp>=0?+c[iFrp]:0)||0, sat:label });
+      }
+    }catch(e){ /* αγνόησε αυτή την πηγή, συνέχισε με την επόμενη */ }
   }
   const out = { ok:true, powered:true, fires, count:fires.length };
   firesCache = { t: Date.now(), data: out };

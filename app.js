@@ -4,9 +4,11 @@
    ============================================================ */
 
 // ---- Ρυθμίσεις ----
-// Δωρεάν κλειδί NASA FIRMS (ενεργές εστίες) από: https://firms.modaps.eosdis.nasa.gov/api/area/
-// Άφησέ το κενό αν δεν έχεις ακόμη — η εφαρμογή δουλεύει κανονικά χωρίς αυτό.
-const FIRMS_MAP_KEY = '';
+// Δωρεάν κλειδί χάρτη NASA FIRMS (ενεργές εστίες) από: https://firms.modaps.eosdis.nasa.gov/api/area/
+// Όταν τρέχει το backend, οι εστίες έρχονται από εκεί (κλειδί κρυφό). Σε ΣΤΑΤΙΚΗ φιλοξενία
+// (π.χ. github.io, χωρίς backend) χρησιμοποιείται αυτό απευθείας από τον browser — το FIRMS API
+// επιτρέπει CORS. Είναι δωρεάν, read-only, με όριο χρήσης· αν χρειαστεί ανανεώνεται από το FIRMS.
+const FIRMS_MAP_KEY = '24a891b2d51dda2d8456ed44852f7048';
 const REFRESH_MS = 15 * 60 * 1000; // αυτόματη ανανέωση κάθε 15'
 
 // ---- Περιοχές Ελλάδας (αντιπροσωπευτικά σημεία) ----
@@ -455,31 +457,67 @@ function demoAlert(){
   fireAlert(p.lat, p.lon, `${p.n} (κατ.${p.cat.idx}) — δορυφορικός εντοπισμός [demo]`);
 }
 
-// ---- Αυτόματος έλεγχος ΠΡΑΓΜΑΤΙΚΩΝ εστιών (NASA FIRMS μέσω backend) + auto-συναγερμός ----
+// ---- Αυτόματος έλεγχος ΠΡΑΓΜΑΤΙΚΩΝ εστιών (NASA FIRMS) + auto-συναγερμός ----
+// Προτεραιότητα: backend /api/fires (κλειδί κρυφό). Αν δεν υπάρχει backend ή δεν έχει κλειδί
+// (π.χ. στατικό github.io) → απευθείας από NASA FIRMS μέσα από τον browser (επιτρέπει CORS),
+// ώστε οι ζωντανές εστίες να εμφανίζονται ΠΑΝΤΟΥ.
 let seenFires=new Set(), realFireLayer=null, firstFireLoad=true;
+const FIRMS_SOURCES = [['VIIRS_NOAA20_NRT','NOAA-20'], ['VIIRS_SNPP_NRT','SNPP']];
+
+function paintFires(fires, srcLabel){
+  if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
+  realFireLayer.clearLayers();
+  const fresh=[];
+  (fires||[]).forEach(f=>{
+    const id=f.lat.toFixed(3)+','+f.lon.toFixed(3)+','+(f.time||'');
+    if(!seenFires.has(id)){ seenFires.add(id); if(!firstFireLoad) fresh.push(f); }
+    const sat = f.sat ? ` ${f.sat}` : '';
+    L.marker([f.lat,f.lon],{
+      icon:L.divIcon({className:'fireHot', html:'<span></span><i>🔥</i>', iconSize:[26,26], iconAnchor:[13,13]}),
+      zIndexOffset:600, keyboard:false
+    }).addTo(realFireLayer).bindPopup(`🔥 Ενεργή εστία (δορυφόρος VIIRS${sat})<br>Αξιοπιστία: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
+  });
+  const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent = fires.length;
+  const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
+  if(dF) dF.className='meter on';
+  if(mF){ mF.textContent=(fires.length>0? fires.length+' ενεργές'+(srcLabel?' · '+srcLabel:'') : '0 — καθαρά'); mF.className='engMeta live'; }
+  if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)`); }
+  firstFireLoad=false;
+}
+function firmsNoKey(){
+  const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent='—';
+  const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
+  if(dF) dF.className='meter warn'; if(mF) mF.textContent='σε αναμονή κλειδιού';
+}
+// Απευθείας από NASA FIRMS (CORS-enabled) — πολλαπλοί δορυφόροι με dedupe
+async function fetchFiresClient(){
+  if(!FIRMS_MAP_KEY) return null;
+  const area='19.3,34.7,28.4,41.8'; // Ελλάδα: west,south,east,north
+  const seen=new Set(), fires=[];
+  for(const [prod,label] of FIRMS_SOURCES){
+    try{
+      const txt = await (await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/${prod}/${area}/1`)).text();
+      const rows=txt.trim().split(/\r?\n/); const head=(rows.shift()||'').split(',');
+      const iLat=head.indexOf('latitude'),iLon=head.indexOf('longitude'),iConf=head.indexOf('confidence'),iDate=head.indexOf('acq_date'),iTime=head.indexOf('acq_time');
+      for(const line of rows){ const c=line.split(','); if(c.length<3) continue;
+        const lat=+c[iLat], lon=+c[iLon]; if(!lat||!lon) continue;
+        const k=lat.toFixed(3)+','+lon.toFixed(3); if(seen.has(k)) continue; seen.add(k);
+        fires.push({lat,lon,conf:iConf>=0?c[iConf]:'',date:iDate>=0?c[iDate]:'',time:iTime>=0?c[iTime]:'',sat:label}); }
+    }catch(e){ /* αγνόησε αυτή την πηγή */ }
+  }
+  return fires;
+}
 async function loadRealFires(){
+  // 1) Backend (κλειδί κρυφό) όταν υπάρχει & είναι ενεργό
   try{
     const d = await (await fetch('api/fires')).json();
-    const pill=document.getElementById('firesLivePill');
-    if(!d || !d.ok || !d.powered){ if(pill) pill.textContent='—';
-      var dF0=document.getElementById('dFIRMS'), mF0=document.getElementById('mFIRMS');
-      if(dF0) dF0.className='meter warn'; if(mF0) mF0.textContent='σε αναμονή κλειδιού';
-      return; }
-    if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
-    realFireLayer.clearLayers();
-    const fresh=[];
-    (d.fires||[]).forEach(f=>{
-      const id=f.lat.toFixed(3)+','+f.lon.toFixed(3)+','+(f.time||'');
-      if(!seenFires.has(id)){ seenFires.add(id); if(!firstFireLoad) fresh.push(f); }
-      L.circleMarker([f.lat,f.lon],{radius:7,color:'#fff',weight:1,fillColor:'#ff2d00',fillOpacity:.95})
-        .addTo(realFireLayer).bindPopup(`🔥 Ενεργή εστία (δορυφόρος VIIRS)<br>Αξιοπιστία: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
-    });
-    if(pill) pill.textContent = d.count;
-    var dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
-    if(dF) dF.className='meter on'; if(mF){ mF.textContent=(d.count>0? d.count+' ενεργές':'0 — καθαρά'); mF.className='engMeta live'; }
-    if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)`); }
-    firstFireLoad=false;
-  }catch(e){ /* χωρίς backend → αγνόησε */ }
+    if(d && d.ok && d.powered){ paintFires(d.fires||[], 'δορυφόρος'); return; }
+  }catch(e){ /* δεν υπάρχει backend — πάμε σε client fallback */ }
+  // 2) Fallback: απευθείας NASA FIRMS από τον browser (στατικό hosting / backend χωρίς κλειδί)
+  const cf = await fetchFiresClient();
+  if(cf){ paintFires(cf, 'απευθείας δορυφόρος'); return; }
+  // 3) Δεν υπάρχει κλειδί πουθενά
+  firmsNoKey();
 }
 
 // ---- Ασφαλής Έξοδος (γεωεντοπισμός χρήστη) ----

@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#ff5a1f" />
   <link rel="icon" type="image/png" href="icon-192.png" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -47,6 +47,7 @@
         <span><i style="background:#ff9f1c"></i>3 · Υψηλός</span>
         <span><i style="background:#ff3b30"></i>4 · Πολύ υψηλός</span>
         <span><i style="background:#b026ff"></i>5 · Συναγερμός</span>
+        <span style="margin-top:7px;padding-top:7px;border-top:1px solid var(--line2)">🔥 Ζωντανή εστία (δορυφόρος)</span>
       </div>
       <button class="locateBtn" id="locateBtn" title="Βρες με & Ασφαλής Έξοδος">📍 Βρες με</button>
       <div class="loadingMap" id="loadingMap"><span class="spin"></span> Φόρτωση ζωντανών δεδομένων…</div>
@@ -187,7 +188,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="fire_model.js?v=1"></script>
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=8"></script>
   <script>
     if('serviceWorker' in navigator){
       window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));

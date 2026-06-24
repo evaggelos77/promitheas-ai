@@ -239,6 +239,12 @@ body{
 .alertPulse span:nth-child(2){animation-delay:.8s}
 @keyframes ringPulse{0%{width:14px;height:14px;opacity:.85}100%{width:74px;height:74px;opacity:0}}
 
+/* Ζωντανές δορυφορικές εστίες (NASA FIRMS) — 🔥 ξεχωριστά από τους κύκλους κινδύνου */
+.fireHot{background:none; border:none; position:relative; display:flex; align-items:center; justify-content:center}
+.fireHot i{font-style:normal; font-size:17px; z-index:2; line-height:1; filter:drop-shadow(0 0 3px #ff2d00) drop-shadow(0 0 7px rgba(255,90,31,.75))}
+.fireHot span{position:absolute; left:50%; top:50%; width:8px; height:8px; border-radius:50%; background:rgba(255,45,0,.5); transform:translate(-50%,-50%); animation:fireRing 2.4s ease-out infinite}
+@keyframes fireRing{0%{width:7px;height:7px;opacity:.7}100%{width:30px;height:30px;opacity:0}}
+
 /* ---------- Mobile ---------- */
 @media(max-width:900px){
   .hq{grid-template-columns:1fr; grid-template-rows:auto auto}
