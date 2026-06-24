@@ -11,6 +11,11 @@
 const FIRMS_MAP_KEY = '24a891b2d51dda2d8456ed44852f7048';
 const REFRESH_MS = 15 * 60 * 1000; // αυτόματη ανανέωση κάθε 15'
 
+// ---- Διγλωσσία EL/EN: η ενσωμάτωση στο evlabsai.gr περνά ?lang=en ----
+const LANG = (new URLSearchParams(location.search).get('lang') === 'en') ? 'en' : 'el';
+const T = (el, en) => (LANG === 'en' ? en : el);
+const LOC = (LANG === 'en' ? 'en-GB' : 'el-GR');
+
 // ---- Περιοχές Ελλάδας (αντιπροσωπευτικά σημεία) ----
 const REGIONS = [
   // Αττική & γύρω
@@ -62,17 +67,19 @@ const REGIONS = [
 ];
 
 const CAT = [
-  {min:0,  label:'Χαμηλός',      color:'#2ec36b'},
-  {min:20, label:'Μέτριος',      color:'#ffd23f'},
-  {min:40, label:'Υψηλός',       color:'#ff9f1c'},
-  {min:60, label:'Πολύ υψηλός',  color:'#ff3b30'},
-  {min:80, label:'Συναγερμός',   color:'#b026ff'}
+  {min:0,  label:'Χαμηλός',      en:'Low',       color:'#2ec36b'},
+  {min:20, label:'Μέτριος',      en:'Moderate',  color:'#ffd23f'},
+  {min:40, label:'Υψηλός',       en:'High',      color:'#ff9f1c'},
+  {min:60, label:'Πολύ υψηλός',  en:'Very high', color:'#ff3b30'},
+  {min:80, label:'Συναγερμός',   en:'Alarm',     color:'#b026ff'}
 ];
+const catLabel = c => T(c.label, c.en);
 const COMPASS = ['Β','ΒΑ','Α','ΝΑ','Ν','ΝΔ','Δ','ΒΔ'];
+const COMPASS_EN = ['N','NE','E','SE','S','SW','W','NW'];
 
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const compass = deg => COMPASS[Math.round(((deg%360)/45))%8];
-function categoryOf(score){ let i=0; for(let k=0;k<CAT.length;k++){ if(score>=CAT[k].min) i=k; } return {idx:i+1, ...CAT[i]}; }
+const compass = deg => (LANG==='en'?COMPASS_EN:COMPASS)[Math.round(((deg%360)/45))%8];
+function categoryOf(score){ let i=0; for(let k=0;k<CAT.length;k++){ if(score>=CAT[k].min) i=k; } return {idx:i+1, color:CAT[i].color, label:catLabel(CAT[i])}; }
 const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 // Σημείο ~d χλμ. μακριά, σε αζιμούθιο brng (μοίρες) — για πλοήγηση διαφυγής
 function destinationPoint(lat,lon,brng,d){
@@ -167,9 +174,9 @@ function render(points){
       radius:r, color:'#000', weight:1, opacity:.4,
       fillColor:p.cat.color, fillOpacity:.78
     }).addTo(markersLayer).bindPopup(
-      `<b>${p.n}</b><br>Κίνδυνος σήμερα: <b style="color:${p.cat.color}">${p.cat.idx} · ${p.cat.label}</b> (${p.score}/100)`
-      +`<br>🌡️ ${p.temp}°C · 💧 ${p.hum}% · 💨 ${p.wind} χλμ/η ${compass(p.wdir)}`
-      +`<br><span style="opacity:.7">Πρόβλεψη 5ημ.:</span> ${fcMini(p)}`
+      `<b>${p.n}</b><br>${T('Κίνδυνος σήμερα','Risk today')}: <b style="color:${p.cat.color}">${p.cat.idx} · ${p.cat.label}</b> (${p.score}/100)`
+      +`<br>🌡️ ${p.temp}°C · 💧 ${p.hum}% · 💨 ${p.wind} ${T('χλμ/η','km/h')} ${compass(p.wdir)}`
+      +`<br><span style="opacity:.7">${T('Πρόβλεψη 5ημ.','5-day forecast')}:</span> ${fcMini(p)}`
     );
   });
 
@@ -187,7 +194,7 @@ function render(points){
   renderList(sorted.slice(0,8));
   setStatusStrip(top);
   renderForecast(sorted);
-  const ut=document.getElementById('updTime'); if(ut) ut.textContent='ανανέωση '+new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
+  const ut=document.getElementById('updTime'); if(ut) ut.textContent=T('ανανέωση ','updated ')+new Date().toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'});
   promitheasSay(sorted);
 }
 
@@ -204,10 +211,10 @@ function updateAIEngines(points, top){
   if(top && top.cat) setGauge(top.score, top.cat);
   const n = (points||[]).length;
   const trees = (window.PROMETHEAS_FIRE_MODEL && window.PROMETHEAS_FIRE_MODEL.trees) ? window.PROMETHEAS_FIRE_MODEL.trees.length : 0;
-  const mML = document.getElementById('mML'); if(mML) mML.textContent = (trees? trees+' δέντρα · ' : '') + n + ' περιοχές';
+  const mML = document.getElementById('mML'); if(mML) mML.textContent = (trees? trees+T(' δέντρα · ',' trees · ') : '') + n + T(' περιοχές',' regions');
   const dML = document.getElementById('dML'); if(dML) dML.className = 'meter ' + (trees? 'on':'warn');
   const mMeteo = document.getElementById('mMeteo');
-  if(mMeteo) mMeteo.textContent = n + ' περιοχές · ' + new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
+  if(mMeteo) mMeteo.textContent = n + T(' περιοχές · ',' regions · ') + new Date().toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'});
 }
 async function checkAIBrain(){
   const d = document.getElementById('dGPT'), m = document.getElementById('mGPT');
@@ -215,15 +222,15 @@ async function checkAIBrain(){
     const h = await (await fetch('api/health')).json();
     const on = !!(h && h.ai && h.ai.powered);
     if(d) d.className = 'meter ' + (on? 'on':'warn');
-    if(m){ m.textContent = on ? 'ενεργός · συνδεδεμένος' : 'τοπική προβολή'; m.className = 'engMeta'+(on?' live':''); }
-  }catch(e){ if(d) d.className='engDot warn'; if(m) m.textContent='τοπική προβολή'; }
+    if(m){ m.textContent = on ? T('ενεργός · συνδεδεμένος','active · connected') : T('τοπική προβολή','local view'); m.className = 'engMeta'+(on?' live':''); }
+  }catch(e){ if(d) d.className='engDot warn'; if(m) m.textContent=T('τοπική προβολή','local view'); }
 }
 
 // ---- Λίστα περιοχών + αναζήτηση δήμου ----
 function renderList(rows){
   const list = document.getElementById('regionList');
   list.innerHTML = '';
-  if(!rows.length){ list.innerHTML = '<p class="muted">Δεν βρέθηκε περιοχή — δοκίμασε άλλο όνομα.</p>'; return; }
+  if(!rows.length){ list.innerHTML = '<p class="muted">'+T('Δεν βρέθηκε περιοχή — δοκίμασε άλλο όνομα.','No area found — try another name.')+'</p>'; return; }
   rows.forEach(p=>{
     const row = document.createElement('div');
     row.className='regRow';
@@ -244,12 +251,12 @@ function searchRegions(q){
 // ---- Εθνική «μπάρα κατάστασης» (απλά λόγια) ----
 function setStatusStrip(top){
   const strip = document.getElementById('statusStrip'); if(!strip) return;
-  const advice = top.cat.idx>=4 ? 'Απόφυγε κάθε υπαίθρια φωτιά. Να είσαι έτοιμος/η για εκκένωση.'
-              : top.cat.idx===3 ? 'Μην ανάβεις φωτιά ή ψησταριά. Πρόσεχε σπινθήρες — δες την περιοχή σου.'
-              : 'Ήπιες συνθήκες σήμερα — αλλά πάντα προσοχή με φωτιά στην ύπαιθρο.';
+  const advice = top.cat.idx>=4 ? T('Απόφυγε κάθε υπαίθρια φωτιά. Να είσαι έτοιμος/η για εκκένωση.','Avoid any outdoor fire. Be ready to evacuate.')
+              : top.cat.idx===3 ? T('Μην ανάβεις φωτιά ή ψησταριά. Πρόσεχε σπινθήρες — δες την περιοχή σου.','No open fire or BBQ. Watch for sparks — check your area.')
+              : T('Ήπιες συνθήκες σήμερα — αλλά πάντα προσοχή με φωτιά στην ύπαιθρο.','Mild conditions today — but always be careful with outdoor fire.');
   strip.style.background = top.cat.color;
   strip.style.color = top.cat.idx===2 ? '#1a1200' : '#fff';
-  strip.innerHTML = `<b>ΣΗΜΕΡΑ ΣΤΗΝ ΕΛΛΑΔΑ · Κίνδυνος ${top.cat.idx}/5 — ${top.cat.label}</b><span>${advice}</span>`;
+  strip.innerHTML = `<b>${T('ΣΗΜΕΡΑ ΣΤΗΝ ΕΛΛΑΔΑ · Κίνδυνος','TODAY IN GREECE · Risk')} ${top.cat.idx}/5 — ${top.cat.label}</b><span>${advice}</span>`;
 }
 
 // ---- Πρόβλεψη κινδύνου (έως 7 ημέρες, από πρόγνωση καιρού) ----
@@ -267,7 +274,7 @@ function renderForecast(points){
     const avg=cnt?Math.round(sum/cnt):0;
     const cat=categoryOf(avg);
     const dt=new Date(points[0].forecast[d].date);
-    const lbl = d===0?'Σήμ.' : d===1?'Αύρ.' : dt.toLocaleDateString('el-GR',{weekday:'short'}).replace('.','');
+    const lbl = d===0?T('Σήμ.','Today') : d===1?T('Αύρ.','Tmrw') : dt.toLocaleDateString(LOC,{weekday:'short'}).replace('.','');
     html+=`<div class="fcDay"><span class="fcLbl">${lbl}</span><span class="fcDot" style="background:${cat.color}">${cat.idx}</span><span class="fcScore">${avg}/100</span></div>`;
   }
   el.innerHTML=html;
@@ -278,16 +285,16 @@ function promitheasSay(sorted){
   const top = sorted[0];
   const high = sorted.filter(p=>p.cat.idx>=3);
   const windy = sorted.filter(p=>p.wind>=40).sort((a,b)=>b.wind-a.wind);
-  let msg = `🔥 Εθνικός κίνδυνος σήμερα: ${top.cat.idx} · ${top.cat.label}.\n`;
+  let msg = `🔥 ${T('Εθνικός κίνδυνος σήμερα','National risk today')}: ${top.cat.idx} · ${top.cat.label}.\n`;
   if(high.length){
-    msg += `Πιο επικίνδυνες περιοχές: ${high.slice(0,4).map(p=>p.n).join(', ')}.\n`;
+    msg += `${T('Πιο επικίνδυνες περιοχές','Highest-risk areas')}: ${high.slice(0,4).map(p=>p.n).join(', ')}.\n`;
   } else {
-    msg += `Καμία περιοχή σε υψηλό κίνδυνο αυτή τη στιγμή — αλλά μένουμε σε εγρήγορση.\n`;
+    msg += T('Καμία περιοχή σε υψηλό κίνδυνο αυτή τη στιγμή — αλλά μένουμε σε εγρήγορση.\n','No area at high risk right now — but we stay alert.\n');
   }
-  if(windy.length) msg += `💨 Δυνατοί άνεμοι: ${windy[0].n} (${windy[0].wind} χλμ/η ${compass(windy[0].wdir)}).\n`;
-  if(top.cat.idx>=4)      msg += `⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ κάθε χρήση φωτιάς στην ύπαιθρο. Αν δεις καπνό κάλεσε ΑΜΕΣΩΣ 199/112.`;
-  else if(top.cat.idx===3)msg += `⚠️ Μην ανάβεις φωτιά/ψησταριά, απόφυγε εργασίες που βγάζουν σπίθα. Αναφορά καπνού → 199.`;
-  else                    msg += `✅ Ήπιες συνθήκες. Πάντα προσοχή σε υπαίθριες φωτιές και σπινθήρες.`;
+  if(windy.length) msg += `💨 ${T('Δυνατοί άνεμοι','Strong winds')}: ${windy[0].n} (${windy[0].wind} ${T('χλμ/η','km/h')} ${compass(windy[0].wdir)}).\n`;
+  if(top.cat.idx>=4)      msg += T('⛔ ΑΠΑΓΟΡΕΥΕΤΑΙ κάθε χρήση φωτιάς στην ύπαιθρο. Αν δεις καπνό κάλεσε ΑΜΕΣΩΣ 199/112.','⛔ All outdoor fire use is BANNED. If you see smoke, call 199/112 IMMEDIATELY.');
+  else if(top.cat.idx===3)msg += T('⚠️ Μην ανάβεις φωτιά/ψησταριά, απόφυγε εργασίες που βγάζουν σπίθα. Αναφορά καπνού → 199.','⚠️ No open fire/BBQ, avoid spark-producing work. Report smoke → 199.');
+  else                    msg += T('✅ Ήπιες συνθήκες. Πάντα προσοχή σε υπαίθριες φωτιές και σπινθήρες.','✅ Mild conditions. Always be careful with outdoor fire and sparks.');
   // Πρόβλεψη επόμενων ημερών (εθνικός ΜΕΣΟΣ δείκτης — συνεπές με την 5ήμερη)
   const fdays = sorted[0].forecast || [];
   if(fdays.length>1){
@@ -295,10 +302,10 @@ function promitheasSay(sorted){
     const todayC = natCat(0); let worst=todayC, worstD=0;
     for(let d=1; d<Math.min(5,fdays.length); d++){ const c=natCat(d); if(c>worst){ worst=c; worstD=d; } }
     if(worst>todayC){
-      const dt=new Date(fdays[worstD].date).toLocaleDateString('el-GR',{weekday:'long'});
-      msg += `\n📅 Προσοχή: ο μέσος εθνικός κίνδυνος ανεβαίνει σε «${CAT[worst-1].label}» την ${dt}.`;
+      const dt=new Date(fdays[worstD].date).toLocaleDateString(LOC,{weekday:'long'});
+      msg += `\n📅 ${T('Προσοχή: ο μέσος εθνικός κίνδυνος ανεβαίνει σε','Heads-up: average national risk rises to')} «${catLabel(CAT[worst-1])}» ${T('την','on')} ${dt}.`;
     } else {
-      msg += `\n📅 Επόμενες μέρες: ο μέσος εθνικός κίνδυνος παραμένει γύρω στο «${CAT[todayC-1].label}».`;
+      msg += `\n📅 ${T('Επόμενες μέρες: ο μέσος εθνικός κίνδυνος παραμένει γύρω στο','Coming days: average national risk stays around')} «${catLabel(CAT[todayC-1])}».`;
     }
   }
   document.getElementById('aiSay').textContent = msg;
@@ -309,10 +316,10 @@ const EFFIS_WMS = 'https://maps.effis.emergency.copernicus.eu/effis';
 const todayISO = () => new Date().toISOString().slice(0,10);
 const yesterdayISO = () => new Date(Date.now()-86400000).toISOString().slice(0,10);
 const LAYER_DEFS = {
-  fires: {layers:'all.hs',               label:'🛰️ Ενεργές εστίες',      on:true,  opacity:0.95},
-  fwi:   {layers:'mf010.fwi',            label:'🔥 Επικινδυνότητα (FWI)', on:false, opacity:0.55, time:true},
-  burnt: {layers:'modis.ba.poly.season', label:'🌳 Καμένες φέτος',        on:false, opacity:0.6},
-  sat:   {label:'🛰️ Δορυφορική εικόνα', on:false, opacity:1, maxNativeZoom:16, attr:'Sentinel-2 cloudless · EOX',
+  fires: {layers:'all.hs',               label:'🛰️ Ενεργές εστίες',      labelEn:'🛰️ Active hotspots',  on:true,  opacity:0.95},
+  fwi:   {layers:'mf010.fwi',            label:'🔥 Επικινδυνότητα (FWI)', labelEn:'🔥 Fire danger (FWI)', on:false, opacity:0.55, time:true},
+  burnt: {layers:'modis.ba.poly.season', label:'🌳 Καμένες φέτος',        labelEn:'🌳 Burnt this year',   on:false, opacity:0.6},
+  sat:   {label:'🛰️ Δορυφορική εικόνα', labelEn:'🛰️ Satellite imagery', on:false, opacity:1, maxNativeZoom:16, attr:'Sentinel-2 cloudless · EOX',
           xyz:'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/g/{z}/{y}/{x}.jpg'}
 };
 const wmsLayers = {};
@@ -333,7 +340,7 @@ function initLayers(){
     if(def.on) wmsLayers[k].addTo(map);
     const b = document.createElement('button');
     b.className = 'layerBtn' + (def.on ? ' active' : '');
-    b.textContent = def.label;
+    b.textContent = T(def.label, def.labelEn||def.label);
     b.onclick = ()=>{
       def.on = !def.on;
       if(def.on){ wmsLayers[k].addTo(map); b.classList.add('active'); }
@@ -364,13 +371,14 @@ const UNITS = [
   {n:'Εναέριο Θεσσαλονίκης',lat:40.52,lon:22.97,t:'🚁',s:'Διαθέσιμο'}
 ];
 const unitColor = s => s==='Σε συμβάν' ? '#ff3b30' : s==='Καθ’ οδόν' ? '#ffd23f' : '#2ec36b';
+const unitStatusTxt = s => T(s, ({'Διαθέσιμο':'Available','Καθ’ οδόν':'En route','Σε συμβάν':'On incident'})[s]||s);
 let unitsLayer=null, unitsOn=false;
 function makeUnitsLayer(){
   const g=L.layerGroup();
   UNITS.forEach(u=>{
     const col=unitColor(u.s);
     L.marker([u.lat,u.lon],{icon:L.divIcon({className:'unitIcon',html:`<div style="font-size:22px;filter:drop-shadow(0 0 4px ${col})">${u.t}</div>`,iconSize:[26,26],iconAnchor:[13,13]})})
-      .bindPopup(`${u.t} <b>${u.n}</b><br>Κατάσταση: <b style="color:${col}">${u.s}</b>`).addTo(g);
+      .bindPopup(`${u.t} <b>${u.n}</b><br>${T('Κατάσταση','Status')}: <b style="color:${col}">${unitStatusTxt(u.s)}</b>`).addTo(g);
   });
   return g;
 }
@@ -387,7 +395,7 @@ function setSpreadMode(on){
   spreadMode=on;
   const mapEl=document.getElementById('map'); if(mapEl) mapEl.style.cursor=on?'crosshair':'';
   const b=document.getElementById('spreadBtn');
-  if(b){ b.classList.toggle('active',on); b.textContent = on?'🎯 Κάνε κλικ στον χάρτη…':'🔥 Προσομοίωση εξάπλωσης'; }
+  if(b){ b.classList.toggle('active',on); b.textContent = on?T('🎯 Κάνε κλικ στον χάρτη…','🎯 Click on the map…'):T('🔥 Προσομοίωση εξάπλωσης','🔥 Spread simulation'); }
 }
 async function simulateSpread(lat,lon){
   let wind=15, wdir=0;
@@ -417,11 +425,11 @@ async function simulateSpread(lat,lon){
   responseLayer=L.layerGroup().addTo(map);
   ranked.forEach((u,i)=>L.polyline([[u.lat,u.lon],[lat,lon]],{color:i===0?'#2ec36b':'#8ff6ff',weight:i===0?3.5:1.5,opacity:.85,dashArray:i===0?null:'6 7'}).addTo(responseLayer));
 
-  const nearHtml = ranked.map((u,i)=>`${i===0?'🥇 ':'• '}${u.t} ${u.n} — <b>${u.d.toFixed(1)} χλμ · ~${u.eta}′</b>`).join('<br>');
-  spreadFire.bindPopup(`🔥 <b>Σημείο φωτιάς</b><br>Άνεμος ${Math.round(wind)} χλμ/η από ${compass(wdir)}<br><b style="color:#ff7a3c">Εξάπλωση προς ${compass(toBear)}</b> (~${len.toFixed(0)} χλμ)<hr style="border:none;border-top:1px solid rgba(255,255,255,.15);margin:7px 0">🎯 <b>Πλησιέστερα μέσα:</b><br>${nearHtml}<br><span style="opacity:.6;font-size:11px">ETA εκτίμηση (δρόμος ~55 χλμ/η · εναέρια ~160).</span>`).openPopup();
+  const nearHtml = ranked.map((u,i)=>`${i===0?'🥇 ':'• '}${u.t} ${u.n} — <b>${u.d.toFixed(1)} ${T('χλμ','km')} · ~${u.eta}′</b>`).join('<br>');
+  spreadFire.bindPopup(`🔥 <b>${T('Σημείο φωτιάς','Fire point')}</b><br>${T('Άνεμος','Wind')} ${Math.round(wind)} ${T('χλμ/η από','km/h from')} ${compass(wdir)}<br><b style="color:#ff7a3c">${T('Εξάπλωση προς','Spread towards')} ${compass(toBear)}</b> (~${len.toFixed(0)} ${T('χλμ','km')})<hr style="border:none;border-top:1px solid rgba(255,255,255,.15);margin:7px 0">🎯 <b>${T('Πλησιέστερα μέσα','Nearest units')}:</b><br>${nearHtml}<br><span style="opacity:.6;font-size:11px">${T('ETA εκτίμηση (δρόμος ~55 χλμ/η · εναέρια ~160).','ETA estimate (road ~55 km/h · aerial ~160).')}</span>`).openPopup();
 
   const res=document.getElementById('spreadResult');
-  if(res) res.innerHTML = `<div class="srHead">🎯 Πλησιέστερα μέσα → χρόνος άφιξης</div>`+ranked.map((u,i)=>`<div class="srRow"><span>${i===0?'🥇':'&nbsp;&nbsp;&nbsp;'} ${u.t} ${u.n}</span><span class="srEta">${u.d.toFixed(1)} χλμ · ~${u.eta}′</span></div>`).join('');
+  if(res) res.innerHTML = `<div class="srHead">🎯 ${T('Πλησιέστερα μέσα → χρόνος άφιξης','Nearest units → arrival time')}</div>`+ranked.map((u,i)=>`<div class="srRow"><span>${i===0?'🥇':'&nbsp;&nbsp;&nbsp;'} ${u.t} ${u.n}</span><span class="srEta">${u.d.toFixed(1)} ${T('χλμ','km')} · ~${u.eta}′</span></div>`).join('');
 }
 
 // ---- 🚨 Σύστημα συναγερμού: ήχος σειρήνας + animation στον χάρτη + banner ----
@@ -440,7 +448,7 @@ function playSiren(){
 function fireAlert(lat, lon, title, withSound){
   const bn=document.getElementById('alertBanner');
   if(bn){
-    bn.innerHTML = `🚨 <span><b>ΣΥΝΑΓΕΡΜΟΣ ΦΩΤΙΑΣ</b> — ${String(title||'').replace(/[<>]/g,'')}</span> <button aria-label="Κλείσιμο">✕</button>`;
+    bn.innerHTML = `🚨 <span><b>${T('ΣΥΝΑΓΕΡΜΟΣ ΦΩΤΙΑΣ','FIRE ALERT')}</b> — ${String(title||'').replace(/[<>]/g,'')}</span> <button aria-label="${T('Κλείσιμο','Close')}">✕</button>`;
     bn.hidden=false;
     bn.querySelector('button').onclick=()=>{ bn.hidden=true; };
     clearTimeout(window.__alertT); window.__alertT=setTimeout(()=>{ bn.hidden=true; }, 10000);
@@ -453,8 +461,8 @@ function fireAlert(lat, lon, title, withSound){
 }
 function demoAlert(){
   const p=LAST_POINTS[0];
-  if(!p){ fireAlert(38.32,23.32,'Θήβα — δοκιμή'); return; }
-  fireAlert(p.lat, p.lon, `${p.n} (κατ.${p.cat.idx}) — δορυφορικός εντοπισμός [demo]`);
+  if(!p){ fireAlert(38.32,23.32,T('Θήβα — δοκιμή','Thebes — test')); return; }
+  fireAlert(p.lat, p.lon, `${p.n} ${T('(κατ.','(cat.')}${p.cat.idx}) — ${T('δορυφορικός εντοπισμός [demo]','satellite detection [demo]')}`);
 }
 
 // ---- Αυτόματος έλεγχος ΠΡΑΓΜΑΤΙΚΩΝ εστιών (NASA FIRMS) + auto-συναγερμός ----
@@ -475,19 +483,19 @@ function paintFires(fires, srcLabel){
     L.marker([f.lat,f.lon],{
       icon:L.divIcon({className:'fireHot', html:'<span></span><i>🔥</i>', iconSize:[26,26], iconAnchor:[13,13]}),
       zIndexOffset:600, keyboard:false
-    }).addTo(realFireLayer).bindPopup(`🔥 Ενεργή εστία (δορυφόρος VIIRS${sat})<br>Αξιοπιστία: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
+    }).addTo(realFireLayer).bindPopup(`🔥 ${T('Ενεργή εστία (δορυφόρος VIIRS','Active hotspot (VIIRS satellite')}${sat})<br>${T('Αξιοπιστία','Confidence')}: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
   });
   const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent = fires.length;
   const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
   if(dF) dF.className='meter on';
-  if(mF){ mF.textContent=(fires.length>0? fires.length+' ενεργές'+(srcLabel?' · '+srcLabel:'') : '0 — καθαρά'); mF.className='engMeta live'; }
-  if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)`); }
+  if(mF){ mF.textContent=(fires.length>0? fires.length+T(' ενεργές',' active')+(srcLabel?' · '+srcLabel:'') : T('0 — καθαρά','0 — clear')); mF.className='engMeta live'; }
+  if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} ${T('νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)','new hotspots — satellite detection (VIIRS)')}`); }
   firstFireLoad=false;
 }
 function firmsNoKey(){
   const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent='—';
   const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
-  if(dF) dF.className='meter warn'; if(mF) mF.textContent='σε αναμονή κλειδιού';
+  if(dF) dF.className='meter warn'; if(mF) mF.textContent=T('σε αναμονή κλειδιού','awaiting key');
 }
 // Απευθείας από NASA FIRMS (CORS-enabled) — πολλαπλοί δορυφόροι με dedupe
 async function fetchFiresClient(){
@@ -511,11 +519,11 @@ async function loadRealFires(){
   // 1) Backend (κλειδί κρυφό) όταν υπάρχει & είναι ενεργό
   try{
     const d = await (await fetch('api/fires')).json();
-    if(d && d.ok && d.powered){ paintFires(d.fires||[], 'δορυφόρος'); return; }
+    if(d && d.ok && d.powered){ paintFires(d.fires||[], T('δορυφόρος','satellite')); return; }
   }catch(e){ /* δεν υπάρχει backend — πάμε σε client fallback */ }
   // 2) Fallback: απευθείας NASA FIRMS από τον browser (στατικό hosting / backend χωρίς κλειδί)
   const cf = await fetchFiresClient();
-  if(cf){ paintFires(cf, 'απευθείας δορυφόρος'); return; }
+  if(cf){ paintFires(cf, T('απευθείας δορυφόρος','direct satellite')); return; }
   // 3) Δεν υπάρχει κλειδί πουθενά
   firmsNoKey();
 }
@@ -524,54 +532,54 @@ async function loadRealFires(){
 function safeExit(){
   const box = document.getElementById('safeBox');
   const st  = document.getElementById('myStatus');
-  if(!navigator.geolocation){ st.textContent='Η συσκευή δεν υποστηρίζει γεωεντοπισμό.'; return; }
-  st.textContent = 'Εντοπισμός τοποθεσίας…';
+  if(!navigator.geolocation){ st.textContent=T('Η συσκευή δεν υποστηρίζει γεωεντοπισμό.','Your device does not support geolocation.'); return; }
+  st.textContent = T('Εντοπισμός τοποθεσίας…','Locating…');
   navigator.geolocation.getCurrentPosition(async pos=>{
     const {latitude:lat, longitude:lon} = pos.coords;
     try{
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
         +`&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m`
         +`&daily=temperature_2m_max,wind_speed_10m_max,precipitation_sum&past_days=3&forecast_days=1&timezone=auto&wind_speed_unit=kmh`;
-      const p = parsePoint(await (await fetch(url)).json(), {n:'Η περιοχή μου',lat,lon});
+      const p = parsePoint(await (await fetch(url)).json(), {n:T('Η περιοχή μου','My area'),lat,lon});
       map.setView([lat,lon],11);
       if(userMarker) map.removeLayer(userMarker);
-      userMarker = L.marker([lat,lon]).addTo(map).bindPopup('📍 Είσαι εδώ').openPopup();
+      userMarker = L.marker([lat,lon]).addTo(map).bindPopup(T('📍 Είσαι εδώ','📍 You are here')).openPopup();
 
       const fromDir = compass(p.wdir);              // απ' όπου φυσά ο άνεμος
       const fireDir = compass((p.wdir+180)%360);    // προς τα εκεί «τρέχει» η φωτιά
       const safe = destinationPoint(lat, lon, p.wdir, 8); // ~8χλμ αντίθετα στη φωτιά
       const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${lat},${lon}&destination=${safe.lat.toFixed(5)},${safe.lon.toFixed(5)}&travelmode=driving`;
-      st.textContent = `Περιοχή σου: κατηγορία ${p.cat.idx} (${p.cat.label}).`;
+      st.textContent = `${T('Περιοχή σου: κατηγορία','Your area: category')} ${p.cat.idx} (${p.cat.label}).`;
       box.hidden=false;
-      box.innerHTML = `<h4 style="color:${p.cat.color}">Κίνδυνος: ${p.cat.idx} · ${p.cat.label} (${p.score}/100)</h4>
-        🌡️ ${p.temp}°C · 💧 ${p.hum}% · 💨 ${p.wind} χλμ/η (φυσά από ${fromDir})
-        <div style="margin-top:10px">Αν δεις φωτιά/καπνό, η πιθανή διάδοση είναι προς <b>${fireDir}</b>.</div>
-        <div class="dir">🧭 Φύγε προς ${fromDir} (αντίθετα στη φωτιά)</div>
+      box.innerHTML = `<h4 style="color:${p.cat.color}">${T('Κίνδυνος','Risk')}: ${p.cat.idx} · ${p.cat.label} (${p.score}/100)</h4>
+        🌡️ ${p.temp}°C · 💧 ${p.hum}% · 💨 ${p.wind} ${T('χλμ/η (φυσά από','km/h (blowing from')} ${fromDir})
+        <div style="margin-top:10px">${T('Αν δεις φωτιά/καπνό, η πιθανή διάδοση είναι προς','If you see fire/smoke, likely spread is towards')} <b>${fireDir}</b>.</div>
+        <div class="dir">🧭 ${T('Φύγε προς','Head towards')} ${fromDir} ${T('(αντίθετα στη φωτιά)','(away from the fire)')}</div>
         <ul>
-          <li>Κινήσου <b>μακριά από τον καπνό</b>, ποτέ προς τα εκεί.</li>
-          <li><b>Ποτέ ανηφόρα</b> — η φωτιά τρέχει γρήγορα στην ανηφόρα.</li>
-          <li>Κατευθύνσου σε <b>ανοιχτό χώρο, δρόμο ή θάλασσα</b>.</li>
-          <li>Πάρε νερό, σκέπασε μύτη/στόμα με βρεγμένο ύφασμα.</li>
-          <li>Κάλεσε <b>112</b> και ειδοποίησε γείτονες.</li>
+          <li>${T('Κινήσου <b>μακριά από τον καπνό</b>, ποτέ προς τα εκεί.','Move <b>away from the smoke</b>, never towards it.')}</li>
+          <li>${T('<b>Ποτέ ανηφόρα</b> — η φωτιά τρέχει γρήγορα στην ανηφόρα.','<b>Never uphill</b> — fire races fast uphill.')}</li>
+          <li>${T('Κατευθύνσου σε <b>ανοιχτό χώρο, δρόμο ή θάλασσα</b>.','Head to an <b>open area, road or the sea</b>.')}</li>
+          <li>${T('Πάρε νερό, σκέπασε μύτη/στόμα με βρεγμένο ύφασμα.','Take water, cover nose/mouth with a wet cloth.')}</li>
+          <li>${T('Κάλεσε <b>112</b> και ειδοποίησε γείτονες.','Call <b>112</b> and warn your neighbours.')}</li>
         </ul>
-        <a class="bigBtn safe gmapsBtn" target="_blank" rel="noopener" href="${gmaps}">🧭 Πλοήγηση διαφυγής (Google Maps)</a>`;
-    }catch(e){ st.textContent='Σφάλμα λήψης δεδομένων περιοχής.'; }
-  }, ()=>{ st.textContent='Δεν δόθηκε άδεια τοποθεσίας. Επίτρεψέ την για οδηγίες διαφυγής.'; },
+        <a class="bigBtn safe gmapsBtn" target="_blank" rel="noopener" href="${gmaps}">🧭 ${T('Πλοήγηση διαφυγής (Google Maps)','Escape navigation (Google Maps)')}</a>`;
+    }catch(e){ st.textContent=T('Σφάλμα λήψης δεδομένων περιοχής.','Error fetching area data.'); }
+  }, ()=>{ st.textContent=T('Δεν δόθηκε άδεια τοποθεσίας. Επίτρεψέ την για οδηγίες διαφυγής.','Location permission denied. Allow it for escape guidance.'); },
   {enableHighAccuracy:true, timeout:10000});
 }
 
 // ---- Αναφορές πολιτών (localStorage + χάρτης) ----
 const REP_KEY='promitheas_reports';
 const getReports = ()=>{ try{return JSON.parse(localStorage.getItem(REP_KEY)||'[]')}catch{return[]} };
-const sevLabel = s=>({smoke:'Καπνός/μυρωδιά',flames:'Ορατές φλόγες',spreading:'Επεκτείνεται'}[s]||s);
+const sevLabel = s=>(LANG==='en'?{smoke:'Smoke/smell',flames:'Visible flames',spreading:'Spreading fast'}:{smoke:'Καπνός/μυρωδιά',flames:'Ορατές φλόγες',spreading:'Επεκτείνεται'})[s]||s;
 function renderReports(){
   reportsLayer.clearLayers();
   const list=document.getElementById('reportList'); list.innerHTML='';
   const reps=getReports().slice(-6).reverse();
   reps.forEach(r=>{
     if(r.lat) L.circleMarker([r.lat,r.lon],{radius:8,color:'#fff',weight:1,fillColor:'#ff7a3c',fillOpacity:.9})
-      .addTo(reportsLayer).bindPopup(`📢 Αναφορά πολίτη<br><b>${sevLabel(r.sev)}</b><br>${r.text||''}`);
-    const t = new Date(r.time).toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'});
+      .addTo(reportsLayer).bindPopup(`📢 ${T('Αναφορά πολίτη','Citizen report')}<br><b>${sevLabel(r.sev)}</b><br>${r.text||''}`);
+    const t = new Date(r.time).toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'});
     const el=document.createElement('div'); el.className='repItem';
     el.innerHTML=`<b>${sevLabel(r.sev)}</b> · ${t}<br>${r.text||''}`;
     list.appendChild(el);
@@ -602,22 +610,22 @@ function openAuth(){
   const reps = getReports();
   const stat=(v,l,c)=>`<div class="statCard"><div class="statV" style="color:${c||'#fff'}">${v}</div><div class="statL">${l}</div></div>`;
   document.getElementById('authStats').innerHTML =
-      stat(`${top.cat.idx}/5`,'Εθνικός κίνδυνος',top.cat.color)
-    + stat(high,'Περιοχές σε υψηλό (3+)',high?'#ff9f1c':'#2ec36b')
-    + stat(`${avg}/100`,'Μέση βαθμολογία')
-    + stat(reps.length,'Αναφορές πολιτών',reps.length?'#ff7a3c':'#94a6bf')
-    + stat(pts.length,'Περιοχές υπό παρακολούθηση','#8ff6ff')
-    + stat(UNITS.length,'Πυροσβεστικά μέσα (demo)','#ff7a3c');
+      stat(`${top.cat.idx}/5`,T('Εθνικός κίνδυνος','National risk'),top.cat.color)
+    + stat(high,T('Περιοχές σε υψηλό (3+)','Areas at high risk (3+)'),high?'#ff9f1c':'#2ec36b')
+    + stat(`${avg}/100`,T('Μέση βαθμολογία','Average score'))
+    + stat(reps.length,T('Αναφορές πολιτών','Citizen reports'),reps.length?'#ff7a3c':'#94a6bf')
+    + stat(pts.length,T('Περιοχές υπό παρακολούθηση','Areas monitored'),'#8ff6ff')
+    + stat(UNITS.length,T('Πυροσβεστικά μέσα (demo)','Fire units (demo)'),'#ff7a3c');
   const rows = pts.map((p,i)=>`<tr>
       <td>${i+1}</td><td><b>${p.n}</b></td>
       <td><span class="tBadge" style="background:${p.cat.color}">${p.cat.idx}</span>${p.cat.label}</td>
       <td>${p.score}/100</td><td>${p.temp}°C</td><td>${p.hum}%</td><td>${p.wind} ${compass(p.wdir)}</td></tr>`).join('');
   document.getElementById('authTable').innerHTML =
-    `<thead><tr><th>#</th><th>Περιοχή</th><th>Κίνδυνος</th><th>Score</th><th>🌡️</th><th>💧</th><th>💨 χλμ/η</th></tr></thead><tbody>${rows}</tbody>`;
+    `<thead><tr><th>#</th><th>${T('Περιοχή','Area')}</th><th>${T('Κίνδυνος','Risk')}</th><th>Score</th><th>🌡️</th><th>💧</th><th>💨 ${T('χλμ/η','km/h')}</th></tr></thead><tbody>${rows}</tbody>`;
   document.getElementById('authReports').innerHTML = reps.slice().reverse().map(r=>{
-      const t=new Date(r.time).toLocaleString('el-GR');
+      const t=new Date(r.time).toLocaleString(LOC);
       return `<div class="repItem"><b>${sevLabel(r.sev)}</b> · ${t}${r.lat?` · 📍 ${r.lat.toFixed(3)},${r.lon.toFixed(3)}`:''}<br>${r.text||''}</div>`;
-    }).join('') || '<p class="muted">Καμία αναφορά πολίτη ακόμη.</p>';
+    }).join('') || '<p class="muted">'+T('Καμία αναφορά πολίτη ακόμη.','No citizen reports yet.')+'</p>';
   document.getElementById('authView').hidden=false;
 }
 
@@ -650,19 +658,19 @@ function chatAdd(who, msg, cls){
 async function askPromitheas(text){
   text=(text||'').trim(); if(!text) return;
   const input=document.getElementById('chatInput'); if(input) input.value='';
-  chatAdd('Εσύ:', text.replace(/[<>]/g,''), 'cUser');
-  const thinking=chatAdd('ΠΡΟΜΗΘΕΑΣ:', '<span class="muted">σκέφτεται…</span>', 'cBot');
+  chatAdd(T('Εσύ:','You:'), text.replace(/[<>]/g,''), 'cUser');
+  const thinking=chatAdd(T('ΠΡΟΜΗΘΕΑΣ:','PROMITHEAS:'), '<span class="muted">'+T('σκέφτεται…','thinking…')+'</span>', 'cBot');
   try{
     const r=await fetch('api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({message:text, context:buildContext(), history:chatHistory})});
     const d=await r.json();
     if(d && d.ok && d.reply){
-      thinking.innerHTML=`<b>ΠΡΟΜΗΘΕΑΣ:</b> `+d.reply.replace(/[<>]/g,'').replace(/\n/g,'<br>');
+      thinking.innerHTML=`<b>${T('ΠΡΟΜΗΘΕΑΣ:','PROMITHEAS:')}</b> `+d.reply.replace(/[<>]/g,'').replace(/\n/g,'<br>');
       chatHistory.push({role:'user',content:text},{role:'assistant',content:d.reply});
       if(chatHistory.length>12) chatHistory=chatHistory.slice(-12);
     } else { throw new Error((d&&d.error)||'no reply'); }
   }catch(e){
-    thinking.innerHTML=`<b>ΠΡΟΜΗΘΕΑΣ:</b> <span class="muted">Ο Εγκέφαλος ΠΡΟΜΗΘΕΑΣ θα είναι διαθέσιμος στην πλήρη έκδοση (backend στο Render). Σε λίγο online!</span>`;
+    thinking.innerHTML=`<b>${T('ΠΡΟΜΗΘΕΑΣ:','PROMITHEAS:')}</b> <span class="muted">${T('Ο Εγκέφαλος ΠΡΟΜΗΘΕΑΣ θα είναι διαθέσιμος στην πλήρη έκδοση (backend στο Render). Σε λίγο online!','The PROMITHEAS Brain will be available in the full version (Render backend). Online soon!')}</span>`;
   }
 }
 
@@ -682,8 +690,94 @@ function tick(){
     new Date().toLocaleTimeString('el-GR',{timeZone:'Europe/Athens'});
 }
 
+// ---- Στατικά κείμενα HTML στα Αγγλικά (όταν ?lang=en) ----
+function applyStaticI18n(){
+  if(LANG!=='en') return;
+  document.documentElement.lang='en';
+  const set=(sel,txt)=>{ const e=document.querySelector(sel); if(e) e.textContent=txt; };
+  const html=(sel,h)=>{ const e=document.querySelector(sel); if(e) e.innerHTML=h; };
+  const attr=(sel,a,v)=>{ const e=document.querySelector(sel); if(e) e.setAttribute(a,v); };
+  const cardHead=(id,txt)=>{ const e=document.getElementById(id); const b=e&&e.closest('.card')&&e.closest('.card').querySelector('.cardHead b'); if(b) b.textContent=txt; };
+
+  set('.brandHQtext small','Wildfire Prevention & Protection HQ');
+  set('.natRiskLabel','National Risk');
+  set('#authBtn','🚒 Authorities'); attr('#authBtn','title','View for Authorities / Municipalities / Fire Service');
+  set('#statusStrip','Calculating national wildfire risk…');
+
+  html('#legend','<b>Wildfire risk</b>'
+    +'<span><i style="background:#2ec36b"></i>1 · Low</span>'
+    +'<span><i style="background:#ffd23f"></i>2 · Moderate</span>'
+    +'<span><i style="background:#ff9f1c"></i>3 · High</span>'
+    +'<span><i style="background:#ff3b30"></i>4 · Very high</span>'
+    +'<span><i style="background:#b026ff"></i>5 · Alarm</span>'
+    +'<span style="margin-top:7px;padding-top:7px;border-top:1px solid var(--line2)">🔥 Live hotspot (satellite)</span>');
+  set('#locateBtn','📍 Find me'); attr('#locateBtn','title','Find me & Safe Exit');
+  html('#loadingMap','<span class="spin"></span> Loading live data…');
+
+  html('.card.promitheas .cardHead b','🧠 Ask PROMITHEAS');
+  attr('#chatExpand','title','Maximise'); attr('#chatExpand','aria-label','Maximise');
+  set('#aiSay','Reading the weather across Greece…');
+  const qb=document.querySelectorAll('.qBtn');
+  if(qb[0]){ qb[0].textContent='Where is the risk?'; qb[0].dataset.q='Where is the greatest wildfire risk right now and why?'; }
+  if(qb[1]){ qb[1].textContent='Multiple fires'; qb[1].dataset.q='I have simultaneous fires in different areas. Help me prioritise and allocate the resources.'; }
+  if(qb[2]){ qb[2].textContent='Protect a settlement'; qb[2].dataset.q='What protective measures should a settlement near a forest take today?'; }
+  attr('#chatInput','placeholder','e.g. "Are settlements at risk in Thebes?"');
+  set('#aiStatus','🧠 PROMITHEAS Brain — active in the full version (backend).');
+
+  html('.aiEngines .cardHead b','🧠 AI Engines · Live status');
+  set('.gaugeReadout small','out of 100 · national index');
+  set('#gaugeCat','calculating…');
+  const enr=document.querySelectorAll('.engName');
+  if(enr[0]) enr[0].innerHTML='Risk Model <b>FWI-ML</b>';
+  if(enr[1]) enr[1].innerHTML='AI Advisor <b>PROMITHEAS Brain</b>';
+  if(enr[2]) enr[2].innerHTML='Satellite hotspots <b>NASA FIRMS</b>';
+  if(enr[3]) enr[3].innerHTML='Weather <b>Open-Meteo</b>';
+  html('.aiEngines p.muted','Real indicators, live. <b>FWI</b> methodology — the international fire-danger standard of <b>EFFIS</b> & fire services.');
+
+  cardHead('natForecast','📅 Risk forecast · 5 days');
+  { const e=document.getElementById('natForecast'); const p=e&&e.parentElement.querySelector('p.muted'); if(p) p.innerHTML='National view: the country\'s <b>average</b> daily risk index (0-100), from the weather forecast.'; }
+
+  cardHead('safeBtn','📍 My location');
+  set('#myStatus','Tap "Safe Exit" to check your area and get escape guidance.');
+  set('#safeBtn','🧭 Safe Exit');
+
+  cardHead('layerBtns','🗺️ Map layers (satellite)');
+  { const c=document.getElementById('layerBtns'); const ps=c&&c.closest('.card').querySelectorAll('p.muted');
+    if(ps&&ps[0]) ps[0].textContent='Official EFFIS/Copernicus data — tap to show/hide on the map.';
+    if(ps&&ps[1]) ps[1].innerHTML='🔴 Live hotspots (NASA FIRMS): <b id="firesLivePill" style="color:#ff7a3c">—</b> · <b>auto-alert</b> on a new hotspot.';
+    if(ps&&ps[2]) ps[2].innerHTML='🛰️ active hotspots (VIIRS/MODIS) · 🔥 official fire-danger map (FWI) · 🌳 burnt areas this year.'; }
+
+  cardHead('spreadBtn','🚒 Operations tools');
+  set('#unitsBtn','🚒 Fire units'); set('#spreadBtn','🔥 Spread simulation'); set('#alarmBtn','🚨 Alarm test');
+  { const c=document.getElementById('spreadBtn'); const p=c&&c.closest('.card').querySelector('p.muted'); if(p) p.innerHTML='🚒 Units = <b>sample</b> (connects to a real fleet/AVL). 🔥 Spread: click a point → 3 nearest units & arrival time. 🚨 Alarm: sound + map animation — when fully connected it <b>triggers automatically from satellite detection</b>.'; }
+
+  cardHead('regSearch','⚠️ Areas at risk');
+  attr('#regSearch','placeholder','🔎 Find municipality / area / island…');
+
+  cardHead('reportBtn','📢 Report fire / smoke');
+  { const c=document.getElementById('reportBtn'); const p=c&&c.closest('.card').querySelector('p.muted'); if(p) p.textContent='Help spot it early. Your report goes on the map.'; }
+  set('#reportBtn','📷 New report');
+
+  const fs=document.querySelectorAll('.hqFooter span');
+  if(fs[0]) fs[0].textContent='Sources: Open-Meteo (weather) · NASA FIRMS (hotspots) · Copernicus EFFIS (risk index)';
+  if(fs[1]) fs[1].innerHTML='⚠️ Awareness support tool. In an emergency call <b>112</b> and follow Civil Protection.';
+
+  set('#reportModal h3','📢 Fire / smoke report');
+  { const p=document.querySelector('#reportModal .muted'); if(p) p.textContent='Your location is taken from your phone (if you allow it).'; }
+  attr('#reportText','placeholder','What do you see? (e.g. smoke over the mountain, burning smell…)');
+  { const o=document.querySelectorAll('#reportSeverity option'); if(o[0])o[0].textContent='Smoke / smell'; if(o[1])o[1].textContent='Visible flames'; if(o[2])o[2].textContent='Spreading fast'; }
+  set('#reportSubmit','Send report');
+  { const w=document.querySelector('#reportModal .warn'); if(w) w.innerHTML='For emergencies: <b>112</b> / Fire Service <b>199</b>.'; }
+
+  set('#authView .authTop h2','🚒 Authorities & Municipalities HQ');
+  set('#authClose','← Back to citizen view');
+  { const h=document.querySelectorAll('#authView h3'); if(h[0])h[0].textContent='📊 All areas (by risk)'; if(h[1])h[1].textContent='📢 Citizen reports'; }
+  { const p=document.querySelector('#authView .muted.small'); if(p) p.innerHTML='Demo version for Authorities/Municipalities. In full deployment (like Pano AI / Technosylva / ALERTCalifornia / NOA FireHub): a network of <b>AI early smoke-detection cameras</b>, a <b>fire-spread model & “time to arrival”</b>, <b>field push alerts</b>, integration with 112 / Fire Service / Civil Protection, and incident history/analytics.'; }
+}
+
 // ---- Εκκίνηση ----
 async function boot(){
+  applyStaticI18n();
   initMap();
   tick(); setInterval(tick,1000);
   renderReports();
@@ -710,7 +804,7 @@ async function boot(){
   async function refresh(){
     const load=document.getElementById('loadingMap'); load.style.display='flex';
     try{ render(await fetchAll()); }
-    catch(e){ document.getElementById('aiSay').textContent='⚠️ Δεν φορτώθηκαν τα δεδομένα καιρού. Δοκίμασε ανανέωση.'; console.error(e); }
+    catch(e){ document.getElementById('aiSay').textContent=T('⚠️ Δεν φορτώθηκαν τα δεδομένα καιρού. Δοκίμασε ανανέωση.','⚠️ Weather data could not be loaded. Try refreshing.'); console.error(e); }
     load.style.display='none';
   }
   await refresh();
