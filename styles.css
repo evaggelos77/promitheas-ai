@@ -262,6 +262,8 @@ body{
 .lfMain small{font-size:11.5px; color:var(--muted); line-height:1.2}
 .lfFrp{font-size:18px; font-weight:800; color:var(--fire2); white-space:nowrap; text-shadow:0 0 12px rgba(255,59,48,.4)}
 .lfFrp i{font-style:normal; font-size:10px; font-weight:700; color:var(--muted); margin-left:1px}
+.lfStamp{margin-top:9px; padding-top:8px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted); text-align:center}
+.lfStamp b{color:var(--txt)}
 
 /* ---------- Mobile ---------- */
 @media(max-width:900px){

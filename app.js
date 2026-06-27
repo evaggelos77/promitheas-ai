@@ -477,7 +477,7 @@ function demoAlert(){
 // Προτεραιότητα: backend /api/fires (κλειδί κρυφό). Αν δεν υπάρχει backend ή δεν έχει κλειδί
 // (π.χ. στατικό github.io) → απευθείας από NASA FIRMS μέσα από τον browser (επιτρέπει CORS),
 // ώστε οι ζωντανές εστίες να εμφανίζονται ΠΑΝΤΟΥ.
-let seenFires=new Set(), realFireLayer=null, firstFireLoad=true, LIVE_FIRES=[];
+let seenFires=new Set(), realFireLayer=null, firstFireLoad=true, LIVE_FIRES=[], firesLastCheck=null;
 const FIRMS_SOURCES = [['VIIRS_NOAA20_NRT','NOAA-20'], ['VIIRS_SNPP_NRT','SNPP']];
 // Φίλτρα ποιότητας εστιών — το VIIRS δίνει ΠΟΛΛΑ θερμικά σήματα που ΔΕΝ είναι πυρκαγιές
 // (βιομηχανία, ζεστές επιφάνειες, νυχτερινός θόρυβος) + ανιχνεύσεις σε γειτονικές χώρες.
@@ -515,6 +515,22 @@ function clusterFires(raw){
   return cl;
 }
 function confWord(c){ c=(c||'').toLowerCase(); return c==='h'?T('υψηλή','high'):c==='n'?T('μέτρια','nominal'):c==='l'?T('χαμηλή','low'):'—'; }
+// Αζιμούθιο από περιοχή → εστία (για «X χλμ ΒΑ από …»)
+function bearing(la1,lo1,la2,lo2){ const t=x=>x*Math.PI/180;
+  const y=Math.sin(t(lo2-lo1))*Math.cos(t(la2));
+  const x=Math.cos(t(la1))*Math.sin(t(la2))-Math.sin(t(la1))*Math.cos(t(la2))*Math.cos(t(lo2-lo1));
+  return (Math.atan2(y,x)*180/Math.PI+360)%360; }
+// Ώρα δορυφορικής λήψης → τοπική ώρα + «πριν Χ» (πραγματικός χρόνος)
+function fireWhen(f){
+  if(!f.date || f.time==null || f.time==='') return null;
+  const tm=String(f.time).padStart(4,'0');
+  const d=new Date(`${f.date}T${tm.slice(0,2)}:${tm.slice(2,4)}:00Z`);
+  if(isNaN(d.getTime())) return null;
+  const mins=Math.max(0,Math.round((Date.now()-d.getTime())/60000));
+  const h=Math.floor(mins/60), m=mins%60;
+  const rel = LANG==='en' ? (h?`${h}h ${m}m ago`:`${m}m ago`) : (h?`πριν ${h}ω ${m}′`:`πριν ${m}′`);
+  return {loc:d.toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'}), rel, mins};
+}
 
 function paintFires(fires, srcLabel){
   if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
@@ -549,20 +565,27 @@ function paintFires(fires, srcLabel){
 function renderLiveFires(){
   const el=document.getElementById('liveFiresList'); if(!el) return;
   const fl=LIVE_FIRES||[];
+  const stamp = firesLastCheck
+    ? `<div class="lfStamp">🛰️ ${T('Τελευταίος έλεγχος δορυφόρου','Last satellite check')}: <b>${firesLastCheck.toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'})}</b> · ${T('αυτόματα κάθε 5′','auto every 5m')}</div>`
+    : '';
   if(!fl.length){
-    el.innerHTML = `<div class="lfEmpty">✅ ${T('Καμία ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No active hotspot on Greek territory right now.')}</div>`;
+    el.innerHTML = `<div class="lfEmpty">✅ ${T('Καμία ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No active hotspot on Greek territory right now.')}</div>`+stamp;
     return;
   }
   const rows=[...fl].sort((a,b)=>(+b.frp||0)-(+a.frp||0)).map(f=>{
     const nr=nearestRegion(f.lat,f.lon), nm=nr.region?nr.region.n:'—';
+    const dir=nr.region?compass(bearing(nr.region.lat,nr.region.lon,f.lat,f.lon)):'';
+    const where = nr.region ? `${Math.round(nr.km)} ${T('χλμ','km')} ${dir} ${T('από','of')} ${nm}` : `${f.lat.toFixed(2)}, ${f.lon.toFixed(2)}`;
+    const w=fireWhen(f);
+    const when = w ? `🛰️ ${w.loc} · <b>${w.rel}</b>` : '';
     const hot=(+f.frp||0)>=30?' hot':'';
     return `<button class="lfRow${hot}" type="button" data-lat="${f.lat}" data-lon="${f.lon}" aria-label="${nm}">`
       +`<span class="lfFlame">🔥</span>`
-      +`<span class="lfMain"><b>${nm}</b><small>~${Math.round(nr.km)} ${T('χλμ','km')} · ${T('αξιοπιστία','confidence')} ${confWord(f.conf)}${f.count>1?' · '+f.count+' '+T('σημεία','px'):''}${f.time?' · '+f.time+' UTC':''}</small></span>`
+      +`<span class="lfMain"><b>${where}</b><small>${T('αξιοπιστία','confidence')} ${confWord(f.conf)}${f.count>1?' · '+f.count+' '+T('σημεία','px'):''}${when?' · '+when:''}</small></span>`
       +`<span class="lfFrp">${f.frp?Math.round(f.frp)+'<i>MW</i>':''}</span>`
       +`</button>`;
   }).join('');
-  el.innerHTML = `<div class="lfCount">${fl.length} ${fl.length===1?T('ενεργή εστία τώρα','active hotspot now'):T('ενεργές εστίες τώρα','active hotspots now')}</div>`+rows;
+  el.innerHTML = `<div class="lfCount">${fl.length} ${fl.length===1?T('ενεργή εστία τώρα','active hotspot now'):T('ενεργές εστίες τώρα','active hotspots now')}</div>`+rows+stamp;
   el.querySelectorAll('.lfRow').forEach(b=>b.addEventListener('click',()=>{
     const lat=+b.dataset.lat, lon=+b.dataset.lon;
     if(map) map.setView([lat,lon],10);
@@ -571,16 +594,23 @@ function renderLiveFires(){
 function firmsNoKey(){
   const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent='—';
   const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
-  if(dF) dF.className='meter warn'; if(mF) mF.textContent=T('σε αναμονή κλειδιού','awaiting key');
+  if(dF) dF.className='meter warn'; if(mF) mF.textContent=T('δορυφόρος προσωρινά μη διαθέσιμος','satellite temporarily unavailable');
+  const el=document.getElementById('liveFiresList');
+  if(el){
+    const stamp = firesLastCheck ? `<div class="lfStamp">🛰️ ${T('Τελευταία προσπάθεια','Last attempt')}: ${firesLastCheck.toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'})}</div>` : '';
+    el.innerHTML = `<div class="lfEmpty">⚠️ ${T('Ο δορυφόρος NASA FIRMS δεν απαντά αυτή τη στιγμή. Νέα προσπάθεια αυτόματα σε λίγο…','NASA FIRMS satellite is not responding right now. Retrying automatically soon…')}</div>`+stamp;
+  }
 }
 // Απευθείας από NASA FIRMS (CORS-enabled) — πολλαπλοί δορυφόροι· επιστρέφει ΑΚΑΤΕΡΓΑΣΤΑ (το φιλτράρισμα γίνεται στο normalizeFires)
 async function fetchFiresClient(){
   if(!FIRMS_MAP_KEY) return null;
   const area='19.3,34.7,28.4,41.8'; // Ελλάδα: west,south,east,north
-  const out=[];
+  const out=[]; let ok=false; // ok=true αν τουλάχιστον μία πηγή απάντησε (διαφορά «καμία φωτιά» από «αποτυχία σύνδεσης»)
   for(const [prod,label] of FIRMS_SOURCES){
     try{
-      const txt = await (await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/${prod}/${area}/1`)).text();
+      const res = await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/${prod}/${area}/1`);
+      if(!res.ok) continue; // π.χ. 429 rate-limit → δοκίμασε την επόμενη πηγή
+      const txt = await res.text(); ok=true;
       const rows=txt.trim().split(/\r?\n/); const head=(rows.shift()||'').split(',');
       const iLat=head.indexOf('latitude'),iLon=head.indexOf('longitude'),iConf=head.indexOf('confidence'),
             iDate=head.indexOf('acq_date'),iTime=head.indexOf('acq_time'),iFrp=head.indexOf('frp');
@@ -589,9 +619,10 @@ async function fetchFiresClient(){
         out.push({lat,lon,conf:iConf>=0?c[iConf]:'',date:iDate>=0?c[iDate]:'',time:iTime>=0?c[iTime]:'',frp:iFrp>=0?(+c[iFrp]||0):0,sat:label}); }
     }catch(e){ /* αγνόησε αυτή την πηγή */ }
   }
-  return out;
+  return ok ? out : null; // null = δεν απάντησε ΚΑΜΙΑ πηγή (αποτυχία)
 }
 async function loadRealFires(){
+  firesLastCheck = new Date(); // πραγματικός χρόνος: πότε ελέγξαμε τελευταία φορά
   // 1) Backend (κλειδί κρυφό) όταν υπάρχει & είναι ενεργό
   try{
     const d = await (await fetch('api/fires')).json();
@@ -600,7 +631,7 @@ async function loadRealFires(){
   // 2) Fallback: απευθείας NASA FIRMS από τον browser (στατικό hosting / backend χωρίς κλειδί)
   const cf = await fetchFiresClient();
   if(cf){ paintFires(normalizeFires(cf), T('απευθείας δορυφόρος','direct satellite')); return; }
-  // 3) Δεν υπάρχει κλειδί πουθενά
+  // 3) Αποτυχία σύνδεσης με δορυφόρο
   firmsNoKey();
 }
 
