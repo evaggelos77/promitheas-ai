@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#ff5a1f" />
   <link rel="icon" type="image/png" href="icon-192.png" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="styles.css?v=6" />
+  <link rel="stylesheet" href="styles.css?v=7" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -68,6 +68,12 @@
           <button id="chatSend" aria-label="Αποστολή">➤</button>
         </div>
         <p class="muted small" id="aiStatus">🧠 Εγκέφαλος ΠΡΟΜΗΘΕΑΣ — ενεργός στην πλήρη έκδοση (backend).</p>
+      </div>
+
+      <div class="card liveFires">
+        <div class="cardHead"><b>🔥 Ζωντανές εστίες ανά περιοχή</b><span class="liveTag"><i class="livedot"></i>LIVE</span></div>
+        <div id="liveFiresList" class="liveFiresList"><p class="muted small">Έλεγχος δορυφόρων NASA FIRMS…</p></div>
+        <p class="muted small lf-note" style="margin-top:10px">Ενεργές εστίες τελευταίου 24ώρου (δορυφόροι VIIRS), φιλτραρισμένες ως προς θόρυβο &amp; ομαδοποιημένες ανά περιοχή. Σε νέα εστία → αυτόματος συναγερμός. Πάτησε μια εστία για ζουμ στον χάρτη.</p>
       </div>
 
       <div class="card aiEngines">
@@ -188,7 +194,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="fire_model.js?v=1"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
   <script>
     if('serviceWorker' in navigator){
       window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));

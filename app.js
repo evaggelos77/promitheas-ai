@@ -542,7 +542,31 @@ function paintFires(fires, srcLabel){
   if(mF){ mF.textContent=(LIVE_FIRES.length>0? LIVE_FIRES.length+T(' ενεργές εστίες',' active fronts')+(srcLabel?' · '+srcLabel:'') : T('0 — καθαρά','0 — clear')); mF.className='engMeta live'; }
   if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} ${T('νέα ενεργά μέτωπα — δορυφορικός εντοπισμός (VIIRS)','new active fronts — satellite detection (VIIRS)')}`); }
   firstFireLoad=false;
+  renderLiveFires(); // ζωντανή λίστα εστιών ανά περιοχή
   if(LAST_POINTS && LAST_POINTS.length) promitheasSay(LAST_POINTS); // ενημέρωσε το headline ώστε «να τα λέει σωστά»
+}
+// ---- Ζωντανές εστίες ανά περιοχή (καθαρή λίστα που «γράφει» ο ΠΡΟΜΗΘΕΑΣ) ----
+function renderLiveFires(){
+  const el=document.getElementById('liveFiresList'); if(!el) return;
+  const fl=LIVE_FIRES||[];
+  if(!fl.length){
+    el.innerHTML = `<div class="lfEmpty">✅ ${T('Καμία ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No active hotspot on Greek territory right now.')}</div>`;
+    return;
+  }
+  const rows=[...fl].sort((a,b)=>(+b.frp||0)-(+a.frp||0)).map(f=>{
+    const nr=nearestRegion(f.lat,f.lon), nm=nr.region?nr.region.n:'—';
+    const hot=(+f.frp||0)>=30?' hot':'';
+    return `<button class="lfRow${hot}" type="button" data-lat="${f.lat}" data-lon="${f.lon}" aria-label="${nm}">`
+      +`<span class="lfFlame">🔥</span>`
+      +`<span class="lfMain"><b>${nm}</b><small>~${Math.round(nr.km)} ${T('χλμ','km')} · ${T('αξιοπιστία','confidence')} ${confWord(f.conf)}${f.count>1?' · '+f.count+' '+T('σημεία','px'):''}${f.time?' · '+f.time+' UTC':''}</small></span>`
+      +`<span class="lfFrp">${f.frp?Math.round(f.frp)+'<i>MW</i>':''}</span>`
+      +`</button>`;
+  }).join('');
+  el.innerHTML = `<div class="lfCount">${fl.length} ${fl.length===1?T('ενεργή εστία τώρα','active hotspot now'):T('ενεργές εστίες τώρα','active hotspots now')}</div>`+rows;
+  el.querySelectorAll('.lfRow').forEach(b=>b.addEventListener('click',()=>{
+    const lat=+b.dataset.lat, lon=+b.dataset.lon;
+    if(map) map.setView([lat,lon],10);
+  }));
 }
 function firmsNoKey(){
   const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent='—';
@@ -780,6 +804,9 @@ function applyStaticI18n(){
   if(qb[2]){ qb[2].textContent='Protect a settlement'; qb[2].dataset.q='What protective measures should a settlement near a forest take today?'; }
   attr('#chatInput','placeholder','e.g. "Are settlements at risk in Thebes?"');
   set('#aiStatus','🧠 PROMITHEAS Brain — active in the full version (backend).');
+
+  html('.liveFires .cardHead b','🔥 Live hotspots by area');
+  { const p=document.querySelector('.liveFires .lf-note'); if(p) p.innerHTML='Active hotspots over the last 24h (VIIRS satellites), noise-filtered &amp; clustered by area. New hotspot → auto-alert. Tap a hotspot to zoom the map.'; }
 
   html('.aiEngines .cardHead b','🧠 AI Engines · Live status');
   set('.gaugeReadout small','out of 100 · national index');
