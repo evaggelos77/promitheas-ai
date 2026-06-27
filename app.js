@@ -308,6 +308,14 @@ function promitheasSay(sorted){
       msg += `\n📅 ${T('Επόμενες μέρες: ο μέσος εθνικός κίνδυνος παραμένει γύρω στο','Coming days: average national risk stays around')} «${catLabel(CAT[todayC-1])}».`;
     }
   }
+  // Ζωντανές δορυφορικές εστίες — ώστε το headline να συμφωνεί με τον χάρτη (να «τα λέει σωστά»)
+  const fl = LIVE_FIRES||[];
+  if(fl.length){
+    const names = fl.slice(0,3).map(f=>{const nr=nearestRegion(f.lat,f.lon);return nr.region?nr.region.n:'';}).filter(Boolean).join(', ');
+    msg += `\n🔥 ${T('Ενεργές δορυφορικές εστίες τώρα','Active satellite hotspots now')}: ${fl.length}${names?' — '+names:''}${fl.length>3?'…':''}. ${T('Δες τα σημεία 🔥 στον χάρτη.','See the 🔥 points on the map.')}`;
+  } else if(!firstFireLoad){
+    msg += `\n🔥 ${T('Καμία ενεργή δορυφορική εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No active satellite hotspot on Greek territory right now.')}`;
+  }
   document.getElementById('aiSay').textContent = msg;
 }
 
@@ -469,61 +477,105 @@ function demoAlert(){
 // Προτεραιότητα: backend /api/fires (κλειδί κρυφό). Αν δεν υπάρχει backend ή δεν έχει κλειδί
 // (π.χ. στατικό github.io) → απευθείας από NASA FIRMS μέσα από τον browser (επιτρέπει CORS),
 // ώστε οι ζωντανές εστίες να εμφανίζονται ΠΑΝΤΟΥ.
-let seenFires=new Set(), realFireLayer=null, firstFireLoad=true;
+let seenFires=new Set(), realFireLayer=null, firstFireLoad=true, LIVE_FIRES=[];
 const FIRMS_SOURCES = [['VIIRS_NOAA20_NRT','NOAA-20'], ['VIIRS_SNPP_NRT','SNPP']];
+// Φίλτρα ποιότητας εστιών — το VIIRS δίνει ΠΟΛΛΑ θερμικά σήματα που ΔΕΝ είναι πυρκαγιές
+// (βιομηχανία, ζεστές επιφάνειες, νυχτερινός θόρυβος) + ανιχνεύσεις σε γειτονικές χώρες.
+// Χωρίς αυτά εμφανίζονταν «φωτιές παντού» (δεκάδες κουκκίδες αντί για λίγα πραγματικά μέτωπα).
+const FIRE_MIN_FRP    = 4;    // MW — κάτω από αυτό σπάνια είναι πραγματική φωτιά (εκτός αν αξιοπιστία=υψηλή)
+const FIRE_NEAR_GR_KM = 60;   // κράτα μόνο εστίες κοντά σε ελληνικό έδαφος (όχι βάθος Τουρκίας/Αλβανίας/Βουλγαρίας)
+const FIRE_CLUSTER_KM = 3;    // ένωσε γειτονικά pixel του ίδιου μετώπου σε ΜΙΑ εστία (VIIRS 375m σπάει μία φωτιά σε πολλά)
+// Πλησιέστερη ελληνική περιοχή (km) — για φιλτράρισμα «κοντά στην Ελλάδα» & ονομασία εστίας
+function nearestRegion(lat,lon){ let best=null, bd=Infinity;
+  for(const r of REGIONS){ const dd=distKm(lat,lon,r.lat,r.lon); if(dd<bd){ bd=dd; best=r; } }
+  return {region:best, km:bd}; }
+// Καθάρισμα + ομαδοποίηση ακατέργαστων ανιχνεύσεων (κοινό για backend & απευθείας FIRMS)
+function normalizeFires(raw){
+  const seen=new Set(), kept=[];
+  for(const f of (raw||[])){
+    const conf=(f.conf||'').toLowerCase(), frp=+f.frp||0;
+    if(conf==='l') continue;                              // πέτα χαμηλή αξιοπιστία
+    if(conf!=='h' && frp>0 && frp<FIRE_MIN_FRP) continue; // πέτα αδύναμο θερμικό σήμα (θόρυβος), εκτός αν υψηλή αξιοπιστία
+    if(nearestRegion(f.lat,f.lon).km>FIRE_NEAR_GR_KM) continue; // μόνο κοντά σε ελληνικό έδαφος
+    const k=f.lat.toFixed(3)+','+f.lon.toFixed(3); if(seen.has(k)) continue; seen.add(k);
+    kept.push(f);
+  }
+  return clusterFires(kept);
+}
+// Ομαδοποίηση γειτονικών pixel → ΕΝΑ ενεργό μέτωπο (κρατά το ισχυρότερο FRP/αξιοπιστία, μετρά τα pixel)
+function clusterFires(raw){
+  const cl=[]; raw.sort((a,b)=>(+b.frp||0)-(+a.frp||0));
+  for(const f of raw){
+    let host=null;
+    for(const g of cl){ if(distKm(f.lat,f.lon,g.lat,g.lon)<=FIRE_CLUSTER_KM){ host=g; break; } }
+    if(host){ host.count++; if((+f.frp||0)>(+host.frp||0)) host.frp=f.frp;
+              if((f.conf||'').toLowerCase()==='h') host.conf='h'; }
+    else cl.push({lat:f.lat,lon:f.lon,conf:f.conf,date:f.date,time:f.time,frp:f.frp,sat:f.sat,count:1});
+  }
+  return cl;
+}
+function confWord(c){ c=(c||'').toLowerCase(); return c==='h'?T('υψηλή','high'):c==='n'?T('μέτρια','nominal'):c==='l'?T('χαμηλή','low'):'—'; }
 
 function paintFires(fires, srcLabel){
   if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
   realFireLayer.clearLayers();
+  LIVE_FIRES = fires || [];
   const fresh=[];
-  (fires||[]).forEach(f=>{
+  LIVE_FIRES.forEach(f=>{
     const id=f.lat.toFixed(3)+','+f.lon.toFixed(3)+','+(f.time||'');
     if(!seenFires.has(id)){ seenFires.add(id); if(!firstFireLoad) fresh.push(f); }
     const sat = f.sat ? ` ${f.sat}` : '';
+    const near = nearestRegion(f.lat,f.lon);
     L.marker([f.lat,f.lon],{
       icon:L.divIcon({className:'fireHot', html:'<span></span><i>🔥</i>', iconSize:[26,26], iconAnchor:[13,13]}),
       zIndexOffset:600, keyboard:false
-    }).addTo(realFireLayer).bindPopup(`🔥 ${T('Ενεργή εστία (δορυφόρος VIIRS','Active hotspot (VIIRS satellite')}${sat})<br>${T('Αξιοπιστία','Confidence')}: ${f.conf||'—'}<br>${f.date||''} ${f.time||''} UTC`);
+    }).addTo(realFireLayer).bindPopup(
+      `🔥 ${T('Ενεργή εστία (δορυφόρος VIIRS','Active hotspot (VIIRS satellite')}${sat})`
+      + (near.region? `<br>${T('Κοντά σε','Near')}: <b>${near.region.n}</b> (~${Math.round(near.km)} ${T('χλμ','km')})`:'')
+      + (f.frp? `<br>${T('Ισχύς ακτινοβολίας','Radiative power')}: ${Math.round(f.frp)} MW`:'')
+      + ((f.count>1)? `<br>${T('Σημεία ανίχνευσης','Detection pixels')}: ${f.count}`:'')
+      + `<br>${T('Αξιοπιστία','Confidence')}: ${confWord(f.conf)}<br>${f.date||''} ${f.time||''} UTC`);
   });
-  const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent = fires.length;
+  const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent = LIVE_FIRES.length;
   const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
   if(dF) dF.className='meter on';
-  if(mF){ mF.textContent=(fires.length>0? fires.length+T(' ενεργές',' active')+(srcLabel?' · '+srcLabel:'') : T('0 — καθαρά','0 — clear')); mF.className='engMeta live'; }
-  if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} ${T('νέα σημεία εστιών — δορυφορικός εντοπισμός (VIIRS)','new hotspots — satellite detection (VIIRS)')}`); }
+  if(mF){ mF.textContent=(LIVE_FIRES.length>0? LIVE_FIRES.length+T(' ενεργές εστίες',' active fronts')+(srcLabel?' · '+srcLabel:'') : T('0 — καθαρά','0 — clear')); mF.className='engMeta live'; }
+  if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} ${T('νέα ενεργά μέτωπα — δορυφορικός εντοπισμός (VIIRS)','new active fronts — satellite detection (VIIRS)')}`); }
   firstFireLoad=false;
+  if(LAST_POINTS && LAST_POINTS.length) promitheasSay(LAST_POINTS); // ενημέρωσε το headline ώστε «να τα λέει σωστά»
 }
 function firmsNoKey(){
   const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent='—';
   const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
   if(dF) dF.className='meter warn'; if(mF) mF.textContent=T('σε αναμονή κλειδιού','awaiting key');
 }
-// Απευθείας από NASA FIRMS (CORS-enabled) — πολλαπλοί δορυφόροι με dedupe
+// Απευθείας από NASA FIRMS (CORS-enabled) — πολλαπλοί δορυφόροι· επιστρέφει ΑΚΑΤΕΡΓΑΣΤΑ (το φιλτράρισμα γίνεται στο normalizeFires)
 async function fetchFiresClient(){
   if(!FIRMS_MAP_KEY) return null;
   const area='19.3,34.7,28.4,41.8'; // Ελλάδα: west,south,east,north
-  const seen=new Set(), fires=[];
+  const out=[];
   for(const [prod,label] of FIRMS_SOURCES){
     try{
       const txt = await (await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_MAP_KEY}/${prod}/${area}/1`)).text();
       const rows=txt.trim().split(/\r?\n/); const head=(rows.shift()||'').split(',');
-      const iLat=head.indexOf('latitude'),iLon=head.indexOf('longitude'),iConf=head.indexOf('confidence'),iDate=head.indexOf('acq_date'),iTime=head.indexOf('acq_time');
+      const iLat=head.indexOf('latitude'),iLon=head.indexOf('longitude'),iConf=head.indexOf('confidence'),
+            iDate=head.indexOf('acq_date'),iTime=head.indexOf('acq_time'),iFrp=head.indexOf('frp');
       for(const line of rows){ const c=line.split(','); if(c.length<3) continue;
         const lat=+c[iLat], lon=+c[iLon]; if(!lat||!lon) continue;
-        const k=lat.toFixed(3)+','+lon.toFixed(3); if(seen.has(k)) continue; seen.add(k);
-        fires.push({lat,lon,conf:iConf>=0?c[iConf]:'',date:iDate>=0?c[iDate]:'',time:iTime>=0?c[iTime]:'',sat:label}); }
+        out.push({lat,lon,conf:iConf>=0?c[iConf]:'',date:iDate>=0?c[iDate]:'',time:iTime>=0?c[iTime]:'',frp:iFrp>=0?(+c[iFrp]||0):0,sat:label}); }
     }catch(e){ /* αγνόησε αυτή την πηγή */ }
   }
-  return fires;
+  return out;
 }
 async function loadRealFires(){
   // 1) Backend (κλειδί κρυφό) όταν υπάρχει & είναι ενεργό
   try{
     const d = await (await fetch('api/fires')).json();
-    if(d && d.ok && d.powered){ paintFires(d.fires||[], T('δορυφόρος','satellite')); return; }
+    if(d && d.ok && d.powered){ paintFires(normalizeFires(d.fires||[]), T('δορυφόρος','satellite')); return; }
   }catch(e){ /* δεν υπάρχει backend — πάμε σε client fallback */ }
   // 2) Fallback: απευθείας NASA FIRMS από τον browser (στατικό hosting / backend χωρίς κλειδί)
   const cf = await fetchFiresClient();
-  if(cf){ paintFires(cf, T('απευθείας δορυφόρος','direct satellite')); return; }
+  if(cf){ paintFires(normalizeFires(cf), T('απευθείας δορυφόρος','direct satellite')); return; }
   // 3) Δεν υπάρχει κλειδί πουθενά
   firmsNoKey();
 }
@@ -641,10 +693,15 @@ function buildContext(){
   const natFc = [];
   for(let d=0; d<days; d++){ const mc = p.reduce((m,x)=>{ const f=x.forecast[d]; return f&&f.cat.idx>m?f.cat.idx:m; },1); natFc.push(`ημ${d}:κατ.${mc}`); }
   const av=UNITS.filter(u=>u.s==='Διαθέσιμο').length, en=UNITS.filter(u=>u.s==='Καθ’ οδόν').length, on=UNITS.filter(u=>u.s==='Σε συμβάν').length;
+  const fl = LIVE_FIRES||[];
+  const fireLine = fl.length
+    ? `${fl.length} ${fl.length===1?'ενεργό μέτωπο':'ενεργά μέτωπα'} — `+fl.slice(0,8).map(f=>{const nr=nearestRegion(f.lat,f.lon);return `${nr.region?nr.region.n:'—'}${f.frp?' '+Math.round(f.frp)+'MW':''}`;}).join(', ')
+    : 'καμία επιβεβαιωμένη ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή';
   return [
     `Ημερομηνία: ${new Date().toLocaleDateString('el-GR')}.`,
     `Εθνικός κίνδυνος: κατηγορία ${top.cat.idx}/5 (${top.cat.label}).`,
     `Περιοχές αυξημένου κινδύνου (κατ.3+): ${high.length? high.join(' | ') : 'καμία αυτή τη στιγμή'}.`,
+    `Ενεργές δορυφορικές εστίες (NASA FIRMS, τελευταίο 24ωρο, φιλτραρισμένες ως προς θόρυβο & ομαδοποιημένες): ${fireLine}.`,
     `Εθνική πρόβλεψη 5 ημερών (μέγιστη κατηγορία ανά ημέρα): ${natFc.join(', ')}.`,
     `Πυροσβεστικά μέσα (δείγμα): σύνολο ${UNITS.length} — διαθέσιμα ${av}, καθ’ οδόν ${en}, σε συμβάν ${on}.`
   ].join('\n');
