@@ -324,7 +324,7 @@ const EFFIS_WMS = 'https://maps.effis.emergency.copernicus.eu/effis';
 const todayISO = () => new Date().toISOString().slice(0,10);
 const yesterdayISO = () => new Date(Date.now()-86400000).toISOString().slice(0,10);
 const LAYER_DEFS = {
-  fires: {layers:'all.hs',               label:'🛰️ Ενεργές εστίες',      labelEn:'🛰️ Active hotspots',  on:true,  opacity:0.95},
+  fires: {layers:'all.hs',               label:'🛰️ Ενεργές εστίες (EFFIS, ευρύτερη περιοχή)', labelEn:'🛰️ Active hotspots (EFFIS, wider area)',  on:false, opacity:0.95},
   fwi:   {layers:'mf010.fwi',            label:'🔥 Επικινδυνότητα (FWI)', labelEn:'🔥 Fire danger (FWI)', on:false, opacity:0.55, time:true},
   burnt: {layers:'modis.ba.poly.season', label:'🌳 Καμένες φέτος',        labelEn:'🌳 Burnt this year',   on:false, opacity:0.6},
   sat:   {label:'🛰️ Δορυφορική εικόνα', labelEn:'🛰️ Satellite imagery', on:false, opacity:1, maxNativeZoom:16, attr:'Sentinel-2 cloudless · EOX',
