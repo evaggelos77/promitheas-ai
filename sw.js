@@ -1,7 +1,7 @@
 /* ΠΡΟΜΗΘΕΑΣ AI — service worker: app-shell cache για offline άνοιγμα */
-const CACHE = 'promitheas-v25';
+const CACHE = 'promitheas-v26';
 const SHELL = [
-  './', './index.html', './styles.css?v=8', './fire_model.js?v=1', './app.js?v=14', './manifest.webmanifest', './icon.svg',
+  './', './index.html', './styles.css?v=9', './fire_model.js?v=1', './app.js?v=15', './manifest.webmanifest', './icon.svg',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];

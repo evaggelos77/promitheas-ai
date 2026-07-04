@@ -310,11 +310,15 @@ function promitheasSay(sorted){
   }
   // Ζωντανές δορυφορικές εστίες — ώστε το headline να συμφωνεί με τον χάρτη (να «τα λέει σωστά»)
   const fl = LIVE_FIRES||[];
-  if(fl.length){
-    const names = fl.slice(0,3).map(f=>{const nr=nearestRegion(f.lat,f.lon);return nr.region?nr.region.n:'';}).filter(Boolean).join(', ');
-    msg += `\n🔥 ${T('Ενεργές δορυφορικές εστίες τώρα','Active satellite hotspots now')}: ${fl.length}${names?' — '+names:''}${fl.length>3?'…':''}. ${T('Δες τα σημεία 🔥 στον χάρτη.','See the 🔥 points on the map.')}`;
+  const actF = fl.filter(f=>f.tier!=='watch'), watF = fl.filter(f=>f.tier==='watch');
+  const fnames = arr => arr.slice(0,3).map(f=>{const nr=nearestRegion(f.lat,f.lon);return nr.region?nr.region.n:'';}).filter(Boolean).join(', ');
+  if(actF.length){
+    msg += `\n🔥 ${T('Ενεργές δορυφορικές εστίες τώρα','Active satellite hotspots now')}: ${actF.length} — ${fnames(actF)}${actF.length>3?'…':''}. ${T('Δες τα σημεία 🔥 στον χάρτη.','See the 🔥 points on the map.')}`;
   } else if(!firstFireLoad){
     msg += `\n🔥 ${T('Καμία ενεργή δορυφορική εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No active satellite hotspot on Greek territory right now.')}`;
+  }
+  if(watF.length){
+    msg += `\n👁️ ${watF.length} ${T('ασθενή σήματα υπό παρακολούθηση','weak signals monitored')} — ${fnames(watF)}${watF.length>3?'…':''} (${T('πιθανόν όχι πυρκαγιά','possibly not a fire')}).`;
   }
   document.getElementById('aiSay').textContent = msg;
 }
@@ -482,25 +486,37 @@ const FIRMS_SOURCES = [['VIIRS_NOAA20_NRT','NOAA-20'], ['VIIRS_SNPP_NRT','SNPP']
 // Φίλτρα ποιότητας εστιών — το VIIRS δίνει ΠΟΛΛΑ θερμικά σήματα που ΔΕΝ είναι πυρκαγιές
 // (βιομηχανία, ζεστές επιφάνειες, νυχτερινός θόρυβος) + ανιχνεύσεις σε γειτονικές χώρες.
 // Χωρίς αυτά εμφανίζονταν «φωτιές παντού» (δεκάδες κουκκίδες αντί για λίγα πραγματικά μέτωπα).
-const FIRE_MIN_FRP    = 4;    // MW — κάτω από αυτό σπάνια είναι πραγματική φωτιά (εκτός αν αξιοπιστία=υψηλή)
 const FIRE_NEAR_GR_KM = 60;   // κράτα μόνο εστίες κοντά σε ελληνικό έδαφος (όχι βάθος Τουρκίας/Αλβανίας/Βουλγαρίας)
 const FIRE_CLUSTER_KM = 3;    // ένωσε γειτονικά pixel του ίδιου μετώπου σε ΜΙΑ εστία (VIIRS 375m σπάει μία φωτιά σε πολλά)
+// 2-βάθμια ταξινόμηση: «ενεργή» (δυνατό σήμα) vs «υπό παρακολούθηση» (ασθενές αλλά ομαδοποιημένο —
+// π.χ. νυχτερινή/σιγανή εστία με χαμηλό FRP). Έτσι ΔΕΝ δείχνει κενό ενώ υπάρχουν, ΟΥΤΕ «φωτιές παντού».
+const FIRE_ACTIVE_FRP = 5;    // MW → ΕΝΕΡΓΗ εστία (ή αξιοπιστία=υψηλή)
+const FIRE_WATCH_FRP  = 1.5;  // MW → κατώφλι «υπό παρακολούθηση» (κάτω από αυτό = αμελητέο)
+const FIRE_WATCH_PX   = 2;    // ελάχιστα ομαδοποιημένα pixel για watch (μεμονωμένο ασθενές = θόρυβος)
 // Πλησιέστερη ελληνική περιοχή (km) — για φιλτράρισμα «κοντά στην Ελλάδα» & ονομασία εστίας
 function nearestRegion(lat,lon){ let best=null, bd=Infinity;
   for(const r of REGIONS){ const dd=distKm(lat,lon,r.lat,r.lon); if(dd<bd){ bd=dd; best=r; } }
   return {region:best, km:bd}; }
-// Καθάρισμα + ομαδοποίηση ακατέργαστων ανιχνεύσεων (κοινό για backend & απευθείας FIRMS)
+// Καθάρισμα + ομαδοποίηση + ταξινόμηση (κοινό για backend & απευθείας FIRMS)
 function normalizeFires(raw){
   const seen=new Set(), kept=[];
   for(const f of (raw||[])){
-    const conf=(f.conf||'').toLowerCase(), frp=+f.frp||0;
-    if(conf==='l') continue;                              // πέτα χαμηλή αξιοπιστία
-    if(conf!=='h' && frp>0 && frp<FIRE_MIN_FRP) continue; // πέτα αδύναμο θερμικό σήμα (θόρυβος), εκτός αν υψηλή αξιοπιστία
+    const conf=(f.conf||'').toLowerCase();
+    if(conf==='l') continue;                                    // πάντα πέτα χαμηλή αξιοπιστία
     if(nearestRegion(f.lat,f.lon).km>FIRE_NEAR_GR_KM) continue; // μόνο κοντά σε ελληνικό έδαφος
     const k=f.lat.toFixed(3)+','+f.lon.toFixed(3); if(seen.has(k)) continue; seen.add(k);
     kept.push(f);
   }
-  return clusterFires(kept);
+  const out=[];
+  for(const c of clusterFires(kept)){
+    const maxFrp=+c.frp||0;
+    if(maxFrp>=FIRE_ACTIVE_FRP || c.conf==='h') c.tier='active';              // ΕΝΕΡΓΗ εστία (δυνατό σήμα)
+    else if(c.count>=FIRE_WATCH_PX && maxFrp>=FIRE_WATCH_FRP) c.tier='watch'; // ασθενές αλλά ομαδοποιημένο → παρακολούθηση
+    else continue;                                                            // μεμονωμένο ασθενές σήμα → θόρυβος
+    out.push(c);
+  }
+  out.sort((a,b)=> ((a.tier==='active'?0:1)-(b.tier==='active'?0:1)) || ((+b.frp||0)-(+a.frp||0)));
+  return out;
 }
 // Ομαδοποίηση γειτονικών pixel → ΕΝΑ ενεργό μέτωπο (κρατά το ισχυρότερο FRP/αξιοπιστία, μετρά τα pixel)
 function clusterFires(raw){
@@ -536,26 +552,34 @@ function paintFires(fires, srcLabel){
   if(!realFireLayer) realFireLayer=L.layerGroup().addTo(map);
   realFireLayer.clearLayers();
   LIVE_FIRES = fires || [];
+  const active = LIVE_FIRES.filter(f=>f.tier!=='watch');
   const fresh=[];
   LIVE_FIRES.forEach(f=>{
+    const watch = f.tier==='watch';
     const id=f.lat.toFixed(3)+','+f.lon.toFixed(3)+','+(f.time||'');
-    if(!seenFires.has(id)){ seenFires.add(id); if(!firstFireLoad) fresh.push(f); }
+    if(!watch && !seenFires.has(id)){ seenFires.add(id); if(!firstFireLoad) fresh.push(f); } // συναγερμός ΜΟΝΟ σε νέα ΕΝΕΡΓΗ
     const sat = f.sat ? ` ${f.sat}` : '';
     const near = nearestRegion(f.lat,f.lon);
+    const w = fireWhen(f);
+    const title = watch ? `👁️ ${T('Θερμικό σήμα υπό παρακολούθηση (χαμηλή ένταση)','Thermal signal — monitored (low intensity)')}`
+                        : `🔥 ${T('Ενεργή εστία (δορυφόρος VIIRS','Active hotspot (VIIRS satellite')}${sat})`;
     L.marker([f.lat,f.lon],{
-      icon:L.divIcon({className:'fireHot', html:'<span></span><i>🔥</i>', iconSize:[26,26], iconAnchor:[13,13]}),
-      zIndexOffset:600, keyboard:false
+      icon:L.divIcon({className:watch?'fireHot watch':'fireHot', html:'<span></span><i>🔥</i>', iconSize:watch?[18,18]:[26,26], iconAnchor:watch?[9,9]:[13,13]}),
+      zIndexOffset:watch?400:600, keyboard:false
     }).addTo(realFireLayer).bindPopup(
-      `🔥 ${T('Ενεργή εστία (δορυφόρος VIIRS','Active hotspot (VIIRS satellite')}${sat})`
+      title
       + (near.region? `<br>${T('Κοντά σε','Near')}: <b>${near.region.n}</b> (~${Math.round(near.km)} ${T('χλμ','km')})`:'')
       + (f.frp? `<br>${T('Ισχύς ακτινοβολίας','Radiative power')}: ${Math.round(f.frp)} MW`:'')
       + ((f.count>1)? `<br>${T('Σημεία ανίχνευσης','Detection pixels')}: ${f.count}`:'')
-      + `<br>${T('Αξιοπιστία','Confidence')}: ${confWord(f.conf)}<br>${f.date||''} ${f.time||''} UTC`);
+      + `<br>${T('Αξιοπιστία','Confidence')}: ${confWord(f.conf)}`
+      + (w? `<br>🛰️ ${w.loc} · ${w.rel}`:''));
   });
-  const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent = LIVE_FIRES.length;
+  const watchN = LIVE_FIRES.length - active.length;
+  const pill=document.getElementById('firesLivePill'); if(pill) pill.textContent = active.length + (watchN?` (+${watchN})`:'');
   const dF=document.getElementById('dFIRMS'), mF=document.getElementById('mFIRMS');
   if(dF) dF.className='meter on';
-  if(mF){ mF.textContent=(LIVE_FIRES.length>0? LIVE_FIRES.length+T(' ενεργές εστίες',' active fronts')+(srcLabel?' · '+srcLabel:'') : T('0 — καθαρά','0 — clear')); mF.className='engMeta live'; }
+  if(mF){ mF.textContent = active.length>0 ? active.length+T(' ενεργές',' active')+(watchN?` (+${watchN} ${T('υπό παρ.','watch')})`:'')
+                          : (watchN? watchN+T(' υπό παρακολούθηση',' monitored') : T('0 — καθαρά','0 — clear')); mF.className='engMeta live'; }
   if(fresh.length){ fireAlert(fresh[0].lat, fresh[0].lon, `${fresh.length} ${T('νέα ενεργά μέτωπα — δορυφορικός εντοπισμός (VIIRS)','new active fronts — satellite detection (VIIRS)')}`); }
   firstFireLoad=false;
   renderLiveFires(); // ζωντανή λίστα εστιών ανά περιοχή
@@ -568,24 +592,33 @@ function renderLiveFires(){
   const stamp = firesLastCheck
     ? `<div class="lfStamp">🛰️ ${T('Τελευταίος έλεγχος δορυφόρου','Last satellite check')}: <b>${firesLastCheck.toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'})}</b> · ${T('αυτόματα κάθε 5′','auto every 5m')}</div>`
     : '';
-  if(!fl.length){
-    el.innerHTML = `<div class="lfEmpty">✅ ${T('Καμία ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No active hotspot on Greek territory right now.')}</div>`+stamp;
-    return;
-  }
-  const rows=[...fl].sort((a,b)=>(+b.frp||0)-(+a.frp||0)).map(f=>{
+  const active = fl.filter(f=>f.tier!=='watch'), watch = fl.filter(f=>f.tier==='watch');
+  const rowHtml=(f,isWatch)=>{
     const nr=nearestRegion(f.lat,f.lon), nm=nr.region?nr.region.n:'—';
     const dir=nr.region?compass(bearing(nr.region.lat,nr.region.lon,f.lat,f.lon)):'';
     const where = nr.region ? `${Math.round(nr.km)} ${T('χλμ','km')} ${dir} ${T('από','of')} ${nm}` : `${f.lat.toFixed(2)}, ${f.lon.toFixed(2)}`;
     const w=fireWhen(f);
     const when = w ? `🛰️ ${w.loc} · <b>${w.rel}</b>` : '';
-    const hot=(+f.frp||0)>=30?' hot':'';
-    return `<button class="lfRow${hot}" type="button" data-lat="${f.lat}" data-lon="${f.lon}" aria-label="${nm}">`
+    const hot=(!isWatch && (+f.frp||0)>=30)?' hot':'';
+    return `<button class="lfRow${isWatch?' watch':hot}" type="button" data-lat="${f.lat}" data-lon="${f.lon}" aria-label="${nm}">`
       +`<span class="lfFlame">🔥</span>`
       +`<span class="lfMain"><b>${where}</b><small>${T('αξιοπιστία','confidence')} ${confWord(f.conf)}${f.count>1?' · '+f.count+' '+T('σημεία','px'):''}${when?' · '+when:''}</small></span>`
       +`<span class="lfFrp">${f.frp?Math.round(f.frp)+'<i>MW</i>':''}</span>`
       +`</button>`;
-  }).join('');
-  el.innerHTML = `<div class="lfCount">${fl.length} ${fl.length===1?T('ενεργή εστία τώρα','active hotspot now'):T('ενεργές εστίες τώρα','active hotspots now')}</div>`+rows+stamp;
+  };
+  let html='';
+  if(active.length){
+    html += `<div class="lfCount">${active.length} ${active.length===1?T('ενεργή εστία τώρα','active hotspot now'):T('ενεργές εστίες τώρα','active hotspots now')}</div>`;
+    html += active.map(f=>rowHtml(f,false)).join('');
+  } else {
+    html += `<div class="lfEmpty">✅ ${T('Καμία ΕΝΕΡΓΗ εστία σε ελληνικό έδαφος αυτή τη στιγμή.','No ACTIVE hotspot on Greek territory right now.')}</div>`;
+  }
+  if(watch.length){
+    html += `<div class="lfWatchHead">👁️ ${watch.length} ${watch.length===1?T('σημείο υπό παρακολούθηση','signal monitored'):T('σημεία υπό παρακολούθηση','signals monitored')}</div>`;
+    html += `<div class="lfWatchNote">${T('Ασθενή θερμικά σήματα — πιθανόν όχι πυρκαγιά (νυχτερινός θόρυβος, σιγανή/μικρή εστία, ζεστές επιφάνειες). Επιβεβαιώνονται στο επόμενο πέρασμα δορυφόρου.','Weak thermal signals — possibly not a fire (night noise, small/smouldering fire, warm surfaces). Confirmed on the next satellite pass.')}</div>`;
+    html += watch.map(f=>rowHtml(f,true)).join('');
+  }
+  el.innerHTML = html+stamp;
   el.querySelectorAll('.lfRow').forEach(b=>b.addEventListener('click',()=>{
     const lat=+b.dataset.lat, lon=+b.dataset.lon;
     if(map) map.setView([lat,lon],10);
@@ -749,9 +782,12 @@ function buildContext(){
   for(let d=0; d<days; d++){ const mc = p.reduce((m,x)=>{ const f=x.forecast[d]; return f&&f.cat.idx>m?f.cat.idx:m; },1); natFc.push(`ημ${d}:κατ.${mc}`); }
   const av=UNITS.filter(u=>u.s==='Διαθέσιμο').length, en=UNITS.filter(u=>u.s==='Καθ’ οδόν').length, on=UNITS.filter(u=>u.s==='Σε συμβάν').length;
   const fl = LIVE_FIRES||[];
-  const fireLine = fl.length
-    ? `${fl.length} ${fl.length===1?'ενεργό μέτωπο':'ενεργά μέτωπα'} — `+fl.slice(0,8).map(f=>{const nr=nearestRegion(f.lat,f.lon);return `${nr.region?nr.region.n:'—'}${f.frp?' '+Math.round(f.frp)+'MW':''}`;}).join(', ')
-    : 'καμία επιβεβαιωμένη ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή';
+  const actF = fl.filter(f=>f.tier!=='watch'), watF = fl.filter(f=>f.tier==='watch');
+  const nmFrp = f=>{const nr=nearestRegion(f.lat,f.lon);return `${nr.region?nr.region.n:'—'}${f.frp?' '+Math.round(f.frp)+'MW':''}`;};
+  const fireLine = (actF.length
+    ? `${actF.length} ${actF.length===1?'ενεργό μέτωπο':'ενεργά μέτωπα'} — `+actF.slice(0,8).map(nmFrp).join(', ')
+    : 'καμία επιβεβαιωμένη ενεργή εστία σε ελληνικό έδαφος αυτή τη στιγμή')
+    + (watF.length? `. Επιπλέον ${watF.length} ασθενή θερμικά σήματα υπό παρακολούθηση (${watF.slice(0,5).map(nmFrp).join(', ')}) — πιθανόν όχι πυρκαγιά, προς επιβεβαίωση` : '');
   return [
     `Ημερομηνία: ${new Date().toLocaleDateString('el-GR')}.`,
     `Εθνικός κίνδυνος: κατηγορία ${top.cat.idx}/5 (${top.cat.label}).`,
