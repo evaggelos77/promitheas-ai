@@ -117,27 +117,10 @@ let map, markersLayer, reportsLayer, userMarker;
 let LAST_POINTS = [];
 function initMap(){
   map = L.map('map',{zoomControl:true, attributionControl:true}).setView([38.5,24.2],6);
-  // Βάση χάρτη: Esri Dark Gray Canvas — δωρεάν, ΧΩΡΙΣ API key.
-  // (Το CARTO basemap σταμάτησε να είναι ελεύθερο και γύριζε tiles
-  //  με υδατογράφημα «API KEY REQUIRED» πάνω από όλη την Ευρώπη.)
-  const base = L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-    { maxZoom:16, maxNativeZoom:16, attribution:'&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors' }
-  ).addTo(map);
-  // Ονόματα πόλεων/χωρών σε ξεχωριστό επίπεδο (πιο ευανάγνωστα)
-  L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-    { maxZoom:16, maxNativeZoom:16, pane:'shadowPane' }
-  ).addTo(map);
-  // Δίχτυ ασφαλείας: αν πέσει ο Esri, γυρνάμε αυτόματα σε OpenStreetMap.
-  let baseFailed = 0;
-  base.on('tileerror', () => {
-    if (++baseFailed === 6) {
-      map.removeLayer(base);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { maxZoom:18, attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
-    }
-  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    subdomains:'abcd', maxZoom:18,
+    attribution:'&copy; OpenStreetMap &copy; CARTO'
+  }).addTo(map);
   markersLayer = L.layerGroup().addTo(map);
   reportsLayer = L.layerGroup().addTo(map);
 }
